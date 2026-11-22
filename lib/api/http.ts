@@ -1,3 +1,4 @@
+import { unstable_rethrow } from 'next/navigation';
 import { NextResponse } from 'next/server';
 import { z, ZodError } from 'zod';
 
@@ -70,6 +71,7 @@ export function handle<A extends unknown[]>(
     try {
       return await fn(...a);
     } catch (e) {
+      unstable_rethrow(e);
       if (e instanceof ApiError) return errorResponse(e.status, e.code, e.message);
       if (e instanceof ZodError) {
         return errorResponse(400, 'validation', e.issues[0]?.message ?? 'Invalid request');

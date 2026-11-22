@@ -21,7 +21,6 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
   async headers() {
     return [
       {

@@ -1,6 +1,6 @@
 import { RoleShell } from "@/components/role-shell";
 
-export default function StudentLayout({
+export default async function StudentLayout({
   children,
 }: {
   children: React.ReactNode;
