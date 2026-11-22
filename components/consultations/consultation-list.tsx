@@ -38,6 +38,8 @@ export function ConsultationList({ items }: { items: Consultation[] }) {
     )
   }
 
+  // Server component: rendered once per request, so the current time is stable.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now()
   const byTime = (a: Consultation, b: Consultation) => a.scheduledAt.localeCompare(b.scheduledAt)
   const upcoming = items.filter((i) => Date.parse(i.scheduledAt) >= now).sort(byTime)
