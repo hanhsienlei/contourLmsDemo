@@ -1,8 +1,13 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { displayState } from '@/lib/consultations/display'
+import { displayState, type DisplayState } from '@/lib/consultations/display'
 import type { AdminConsultation } from '@/lib/consultations/service'
-import { LocalTime } from './local-time'
+import { ConsultationTime } from './consultation-time'
 import { StatusBadge } from './status-badge'
+
+const ROW_CLASS: Partial<Record<DisplayState, string>> = {
+  needs_update: 'bg-amber-50/60 dark:bg-amber-950/40',
+  cancelled: 'text-muted-foreground',
+}
 
 /** Read-only admin listing; cancelled rows are included and muted. */
 export function AdminConsultationTable({ items, now }: { items: AdminConsultation[]; now: Date }) {
@@ -11,38 +16,44 @@ export function AdminConsultationTable({ items, now }: { items: AdminConsultatio
       <caption className="sr-only">All consultations</caption>
       <TableHeader>
         <TableRow>
-          <TableHead scope="col">Email</TableHead>
-          <TableHead scope="col">Name</TableHead>
-          <TableHead scope="col">Reason</TableHead>
           <TableHead scope="col">Time</TableHead>
+          <TableHead scope="col">Student</TableHead>
+          <TableHead scope="col">Reason</TableHead>
           <TableHead scope="col">Status</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {items.length === 0 && (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground">
+            <TableCell colSpan={4} className="text-center text-muted-foreground">
               No consultations yet.
             </TableCell>
           </TableRow>
         )}
-        {items.map((item) => (
-          <TableRow key={item.id} className={item.status === 'cancelled' ? 'text-muted-foreground' : undefined}>
-            <TableCell>{item.email}</TableCell>
-            <TableCell>
-              {item.firstName} {item.lastName}
-            </TableCell>
-            <TableCell className="max-w-64 truncate" title={item.reason}>
-              {item.reason}
-            </TableCell>
-            <TableCell>
-              <LocalTime iso={item.scheduledAt} />
-            </TableCell>
-            <TableCell>
-              <StatusBadge state={displayState(item, now)} />
-            </TableCell>
-          </TableRow>
-        ))}
+        {items.map((item) => {
+          const state = displayState(item, now)
+          return (
+            <TableRow key={item.id} className={ROW_CLASS[state]}>
+              <TableCell>
+                <ConsultationTime iso={item.scheduledAt} />
+              </TableCell>
+              <TableCell>
+                <div className="grid">
+                  <span className="font-medium">
+                    {item.firstName} {item.lastName}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{item.email}</span>
+                </div>
+              </TableCell>
+              <TableCell className="max-w-64 truncate" title={item.reason}>
+                {item.reason}
+              </TableCell>
+              <TableCell>
+                <StatusBadge state={state} />
+              </TableCell>
+            </TableRow>
+          )
+        })}
       </TableBody>
     </Table>
   )

@@ -1,5 +1,9 @@
 import Link from 'next/link'
+import { Lock } from 'lucide-react'
 import { AdminConsultationTable } from '@/components/consultations/admin-consultation-table'
+import { TimeZoneNote } from '@/components/consultations/time-zone-note'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { requireRolePage } from '@/lib/auth/guards'
 import { parseAdminListQuery } from '@/lib/consultations/schema'
 import { listAll } from '@/lib/consultations/service'
@@ -39,18 +43,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">All consultations</h1>
+      <header className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">All consultations</h1>
+          <Badge variant="secondary">Admin</Badge>
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="size-4" aria-hidden />
+            Read-only
+          </span>
+        </div>
+        <TimeZoneNote />
+      </header>
       <AdminConsultationTable items={items} now={now} />
-      <nav aria-label="Pagination" className="flex gap-4">
+      <nav aria-label="Pagination" className="flex gap-2">
         {q.cursor && (
-          <Link href="/admin" className="underline underline-offset-4">
-            First page
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin">First page</Link>
+          </Button>
         )}
         {nextCursor && (
-          <Link href={`/admin?cursor=${encodeURIComponent(nextCursor)}`} className="underline underline-offset-4">
-            Next page
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/admin?cursor=${encodeURIComponent(nextCursor)}`}>Next page</Link>
+          </Button>
         )}
       </nav>
     </div>
