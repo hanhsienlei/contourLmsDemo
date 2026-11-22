@@ -54,6 +54,10 @@ The UI barely counts. The design aims to be small, consistent and easy to defend
 - **"Complete"** is the student's own tracking, with no time restriction: it can be marked before the scheduled time. Trade-off: reschedules made outside the system can leave `scheduled_at` inaccurate.
 - **Names are stored on the consultation** because the brief puts them on the form. The account email lives in `profiles` (§7), so an admin can see who booked even if the names typed on the form differ from the account.
 - **Admins are staff accounts.** They don't book. One role per user.
+- **Booking window: 1 to 14 days ahead.**
+  - The 24-hour minimum gives the triage step time to assign a consultant.
+  - The 14-day maximum fits how far ahead high-school students actually plan.
+  - Both are rolling windows from now, not calendar days, so no time zone has to decide when "tomorrow" starts.
 
 ## 5. Approaches considered
 
@@ -106,7 +110,7 @@ Postgres   RLS on (no policies) · data-integrity constraints only
 | Kind of rule | Example | Lives in |
 |---|---|---|
 | Permission: who | owner-only changes, admin-only list | TypeScript (guards + service) |
-| Business: when/what transition | ≤ 1 month ahead, cancelled is final | TypeScript (service) |
+| Business: when/what transition | booked 1–14 days ahead, cancelled is final | TypeScript (service) |
 | Data integrity: what data is valid | status enum, 15-minute alignment, unique active slot | Postgres constraints |
 
 The database keeps only rules that must hold whoever writes, including migrations and seed scripts.
@@ -169,6 +173,15 @@ alter table public.profiles      enable row level security;  -- no policies: den
 alter table public.user_roles    enable row level security;
 alter table public.consultations enable row level security;
 revoke all on public.profiles, public.user_roles, public.consultations from anon, authenticated;
+
+-- locked by default: objects created later in public (by migration, Studio or psql)
+-- get no grants for anon/authenticated unless a migration grants them on purpose
+alter default privileges for role postgres in schema public
+  revoke all on tables    from anon, authenticated;
+alter default privileges for role postgres in schema public
+  revoke all on sequences from anon, authenticated;
+alter default privileges for role postgres in schema public
+  revoke all on functions from anon, authenticated, public;
 ```
 
 - `consultations.user_id` references `profiles`, which itself cascades from `auth.users`. That lets the admin query embed the email with PostgREST (`select('*, profiles(email)')`).
@@ -198,8 +211,9 @@ revoke all on public.profiles, public.user_roles, public.consultations from anon
 
 **Time window** (applies when booking and rescheduling):
 - `scheduled_at` must sit on a 15-minute boundary, with zero seconds. The UI only offers 15-minute options, and the API *rejects* anything else; it doesn't silently round.
-- It must be strictly in the future (`> now`).
-- It must be within one calendar month (`<= addMonths(now, 1)`).
+- It must be at least 24 hours from now and at most 14 days from now (`now + 24h ≤ scheduled_at ≤ now + 14d`).
+  - These are named constants (`MIN_LEAD_HOURS = 24`, `MAX_AHEAD_DAYS = 14`) in `lib/consultations/rules.ts`.
+  - The zod schema, the service and the `SlotPicker` all import them, so changing a value takes one line.
 - Times are stored as `timestamptz` (UTC). The client sends ISO 8601 with an offset, and the UI shows times in the browser's local time zone.
 
 **One active booking per slot:** enforced by the unique index. Service maps Postgres error `23505` to 409.
@@ -226,6 +240,24 @@ scheduled ──complete──▶ completed
 
 **Missing role row:** this fails closed. The user is treated as having no role, so every guarded route returns 403 and every guarded layout redirects to an error page.
 
+## 8a. Security rules for the implementation
+
+These rules are needed because the service holds a key that bypasses RLS. One careless line would undo the design.
+
+1. **No user input in PostgREST filter strings.** Use only `.eq()`, `.gt()`, `.lt()`, `.in()` and similar parameterised builders. Never put user input into `.or('…')` or `.filter('…')` strings. The pagination cursor is decoded and validated with zod (a timestamp and a UUID) before use.
+2. **No mass assignment.** Request schemas are `.strict()`, so unknown keys get 400. The service writes each column by name. `user_id` always comes from the verified session, never from the request body. Never spread the body into an insert or update.
+3. **Validate route ids.** `[id]` must be a UUID, checked with zod; otherwise 400. A malformed id must never reach Postgres (error `22P02` → 500).
+4. **Never return raw database errors.** Known codes are mapped (`23505` → 409). Everything else is logged on the server, and the client gets a generic 500 `{ error: { code: 'internal', message } }`.
+5. **Verify the session.** On the server, use `getClaims()` or `getUser()` only, never `getSession()`, which reads the cookie without verifying it.
+6. **Cap the page size.** `limit` defaults to 20 and must be at most 100.
+7. **The seed script runs locally only.** It aborts unless the Supabase URL's host is `localhost` or `127.0.0.1`, because it deletes users with the secret key.
+8. **Security headers** in `next.config`, shipped in build step 1:
+   - a basic Content-Security-Policy, with `connect-src` allowing the Supabase URL
+   - `frame-ancestors 'none'` and `X-Frame-Options: DENY`
+   - `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`
+
+   Reason: `@supabase/ssr` session cookies are readable by browser JavaScript, so headers that limit cross-site scripting (XSS) protect the session. React already escapes user text, and `dangerouslySetInnerHTML` is never used.
+
 ## 9. API (route handlers, JSON only)
 
 | Method & path | Role | Action |
@@ -234,7 +266,7 @@ scheduled ──complete──▶ completed
 | `POST /api/consultations` | student | book `{firstName, lastName, reason, scheduledAt}` |
 | `PATCH /api/consultations/[id]` | student | `{scheduledAt}` → reschedule, or `{completed: boolean}` → toggle. Exactly one field, otherwise 400 |
 | `POST /api/consultations/[id]/cancel` | student | cancel |
-| `GET /api/admin/consultations` | admin | list all, including cancelled, each row with the account email. Keyset paginated: `?cursor=&limit=`, ordered by `(scheduled_at, id)`. *If pagination is cut for time, this row and §10 say "first N, unpaginated" and the README lists it under "with more time".* |
+| `GET /api/admin/consultations` | admin | list all, including cancelled, each row with the account email. Keyset paginated: `?cursor=&limit=` (limit 20 by default, at most 100), ordered by `(scheduled_at, id)`. *If pagination is cut for time, this row and §10 say "first N, unpaginated" and the README lists it under "with more time".* |
 
 - **Validation:** zod schemas in `lib/consultations/schema.ts`, shared by the form and the routes.
 - **Errors:** `{ error: { code, message } }`.
@@ -254,7 +286,7 @@ scheduled ──complete──▶ completed
 
 - `/auth/*`: the template's login, sign-up and logout. **Sign-up change:** confirmations are off locally, so the user goes straight to `/` after sign-up. The template's "check your email" success page is removed, or no longer linked.
 - `/dashboard` (student): upcoming and past consultations, split by `scheduled_at` against now. Each row has a complete checkbox, Reschedule (dialog) and Cancel (with confirmation). Cancelled rows are shown muted, with no actions.
-- `/consultations/new` (student): the booking form. It uses the **same `SlotPicker`** (date plus 15-minute time select, limited to the next month) as the reschedule dialog.
+- `/consultations/new` (student): the booking form. It uses the **same `SlotPicker`** (date plus 15-minute time select, offering only slots 24 hours to 14 days from now) as the reschedule dialog.
 - `/admin` (admin): a read-only table of all consultations, including cancelled. Columns: account email, first and last name as entered, reason, time, status. Paginated (see the §9 fallback).
 
 **Component quality:**
@@ -304,17 +336,21 @@ README.md
   - a student calling the admin route gets 403
   - double-booking the same slot gets 409
   - the publishable key and a student's JWT get nothing when calling the Supabase API directly (checks the deny-all RLS)
+  - every table in `public` has RLS on. The check runs `select tablename from pg_tables where schemaname = 'public' and not rowsecurity` over a direct Postgres connection to the local database (`pg` package, local DB URL), and it must return nothing.
+- **Unit tests for the security rules:** a body with unknown keys gets 400, a non-UUID id gets 400, a limit over 100 gets 400, and the seed script refuses a non-local URL.
 
 ## 14. Seed data and scripts
 
 **Seeding uses a Node script with the Supabase admin API,** not SQL inserts into `auth.users`. Hand-written `auth.users` rows need GoTrue's exact columns (`instance_id`, `aud`, `role`, a `crypt()` password, empty strings rather than NULL in the token columns), and they break when the auth service changes.
 
 `scripts/seed.ts` (run with `tsx`, using `SUPABASE_SECRET_KEY` against the local URL):
+0. Abort unless the Supabase URL's host is `localhost` or `127.0.0.1` (§8a, rule 7).
 1. Delete the demo users by their fixed emails with `auth.admin.deleteUser`. The cascade removes their profiles, roles and consultations, so the script can be re-run safely.
 2. Create 1 admin and 2 students with `auth.admin.createUser({ email, password, email_confirm: true })`. The sign-up trigger creates their `profiles` and `user_roles` rows.
 3. Promote the admin: `update user_roles set role = 'admin'`.
 4. Insert mock consultations for both students, covering every state: upcoming `scheduled`, past `scheduled`, `completed` and `cancelled`.
    - Times are relative to the moment of seeding (the current hour plus or minus offsets), all on 15-minute boundaries.
+   - Upcoming `scheduled` rows fall 1–14 days ahead, so they look like real bookings and can be rescheduled within the rules.
    - At least one cancelled and one active booking share a slot, to show the partial unique index allows it.
    - Inserts go straight into the database (no service), so past-dated rows are allowed. Only the time-window rule is skipped this way; every database constraint still applies.
 
@@ -328,7 +364,7 @@ The README lists the demo credentials. `supabase/seed.sql` is not used.
 
 Items that don't fit become "with more time" notes in the README, and the spec rows they affect are updated so the README and code agree.
 
-1. Scaffold, migrations, seed script and npm scripts, the guards, the **CSRF origin check**, and the core API and service.
+1. Scaffold, migrations (including default-privilege revokes), the seed script and npm scripts, the guards, the **CSRF origin check**, the **§8a security rules and headers**, and the core API and service.
 2. Frontend: role layouts and redirects, the dashboard, the booking form, the reschedule and cancel dialogs, the admin table.
 3. Tests that student A can't touch student B's bookings (404) and that a student gets 403 on the admin route.
 4. The test that calling the Supabase API directly gets nothing.
@@ -357,7 +393,17 @@ Items that don't fit become "with more time" notes in the README, and the spec r
    - the hardened sign-up trigger
 4. Assumptions (§4), including that email confirmation is off locally.
 5. Schema and migrations.
-6. With more time:
+6. **Security notes:**
+   - the §8a rules
+   - locked-by-default grants plus the RLS-on test
+   - **booking spam:** there's no per-student limit, but the unique-slot rule and the 14-day window cap active future bookings at about 1,250 per student; rate limiting is the proper fix (see "with more time")
+   - **roles take effect immediately:** the role is read on every request, so demoting an admin works at once (a JWT claim would stay stale until the token refreshes)
+7. **In production:**
+   - Supabase read-only roles for team members on the production project
+   - migrations deployed only by CI (`supabase db push` through the GitHub integration or branching), never through Studio or `psql`
+   - a scheduled drift check (`supabase db diff --linked`) that fails if the live schema differs from the migrations
+   - email confirmation on, and Supabase Auth's built-in rate limits on login and sign-up
+8. With more time:
    - role in the JWT through a custom access token hook
    - RLS read policies as a second layer
    - pagination for the student list (and admin, if it was cut)
@@ -372,7 +418,7 @@ Items that don't fit become "with more time" notes in the README, and the spec r
 ## 17. Calls made during review (correct if wrong)
 
 - **No role row:** this fails closed (§8).
-- **"One month":** a calendar month.
+- **Booking window:** a rolling 24 hours to 14 days from now, not calendar days. The values are constants.
 - **Upcoming vs past:** split by date, whatever the status.
 - **A past `scheduled` booking can be cancelled.**
 - **Email confirmation is off locally**, and sign-up goes straight to `/`.
@@ -388,6 +434,5 @@ Items that don't fit become "with more time" notes in the README, and the spec r
 
 - Exact component structure inside the list above, and the styling.
 - Whether the booking form prefills names from the student's last booking.
-- The pagination page size.
 - Next 15 vs 16: use whatever the template installs (`proxy.ts` on 16, `middleware.ts` on 15).
 - Demo users' exact emails, passwords and the mock reasons.
