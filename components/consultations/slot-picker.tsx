@@ -40,7 +40,10 @@ export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props
   const [pickedDay, setPickedDay] = useState<string>()
   if (!days) return <div className="h-9" aria-hidden />
 
-  const day = pickedDay ?? (value ? dayKey(new Date(value)) : initialDay([...days.keys()], currentIso))
+  // Book mode starts with no day; reschedule defaults to the booking's day (or the first bookable one).
+  const day =
+    pickedDay ??
+    (value ? dayKey(new Date(value)) : currentIso ? initialDay([...days.keys()], currentIso) : undefined)
 
   const times = (day && days.get(day)) || []
 
@@ -88,7 +91,8 @@ export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props
                     const ms = slot.getTime()
                     const isCurrent = currentIso !== undefined && Date.parse(currentIso) === ms
                     const isOccupied = !isCurrent && !!occupied?.has(ms)
-                    const selected = !!value && Date.parse(value) === ms
+                    const disabled = isCurrent || isOccupied
+                    const selected = !disabled && !!value && Date.parse(value) === ms
                     const label = format(slot, 'h:mm aaa')
                     return (
                       <Button
@@ -97,7 +101,7 @@ export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props
                         size="sm"
                         variant={selected ? 'default' : 'outline'}
                         aria-pressed={selected}
-                        disabled={isCurrent || isOccupied}
+                        disabled={disabled}
                         title={
                           isCurrent
                             ? 'Your current time'

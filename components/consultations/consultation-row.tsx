@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { actionsFor, type DisplayState, type RowAction } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
+import { ConsultationDialog } from './consultation-dialog'
 import { ConsultationTime } from './consultation-time'
 import { useSlotLabel } from './local-time'
-import { RescheduleDialog } from './reschedule-dialog'
 import { RowActionsMenu } from './row-actions-menu'
 import { StatusBadge } from './status-badge'
 
@@ -17,8 +17,20 @@ type OpenDialog = 'reschedule' | 'cancel' | null
 
 const LABEL: Record<'reschedule' | 'cancel', string> = { reschedule: 'Reschedule', cancel: 'Cancel' }
 
-export function ConsultationRow({ item, state, note }: { item: Consultation; state: DisplayState; note?: string }) {
+export function ConsultationRow({
+  item,
+  state,
+  note,
+  occupied,
+}: {
+  item: Consultation
+  state: DisplayState
+  note?: string
+  /** Epoch ms of the student's active slots, from the server. */
+  occupied: number[]
+}) {
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null)
+  const occupiedSet = useMemo(() => new Set(occupied), [occupied])
   const slot = useSlotLabel(item.scheduledAt)
   const { visible, menu } = actionsFor(state)
   const [primary, ...secondary] = visible
@@ -86,9 +98,10 @@ export function ConsultationRow({ item, state, note }: { item: Consultation; sta
       </div>
       {!cancelled && (
         <>
-          <RescheduleDialog
+          <ConsultationDialog
+            mode="reschedule"
             item={item}
-            trigger={false}
+            occupied={occupiedSet}
             open={openDialog === 'reschedule'}
             onOpenChange={(o) => setOpenDialog(o ? 'reschedule' : null)}
           />

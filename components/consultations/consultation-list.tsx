@@ -1,26 +1,37 @@
-import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { groupForStudent, type DisplayState } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
+import { BookConsultationButton } from './book-consultation-button'
 import { CancelledToggle } from './cancelled-toggle'
 import { ConsultationRow } from './consultation-row'
 
-function BookButton({ children = 'Book a consultation' }: { children?: React.ReactNode }) {
-  return (
-    <Button asChild>
-      <Link href="/consultations/new">{children}</Link>
-    </Button>
-  )
+type BookProps = {
+  /** Epoch ms of the student's active slots. */
+  occupied: number[]
+  defaults: { firstName: string; lastName: string }
 }
 
-function Rows({ items, state, note }: { items: Consultation[]; state: DisplayState; note?: string }) {
-  return items.map((item) => <ConsultationRow key={item.id} item={item} state={state} note={note} />)
+function Rows({
+  items,
+  state,
+  note,
+  occupied,
+}: {
+  items: Consultation[]
+  state: DisplayState
+  note?: string
+  occupied: number[]
+}) {
+  return items.map((item) => (
+    <ConsultationRow key={item.id} item={item} state={state} note={note} occupied={occupied} />
+  ))
 }
 
-export function ConsultationList({ items }: { items: Consultation[] }) {
+export function ConsultationList({ items, occupied, defaults }: { items: Consultation[] } & BookProps) {
+  const bookButton = <BookConsultationButton occupied={occupied} defaults={defaults} />
+
   if (items.length === 0) {
     return (
       <Card>
@@ -29,7 +40,7 @@ export function ConsultationList({ items }: { items: Consultation[] }) {
           <p className="max-w-md text-sm text-muted-foreground">
             A consultation is a one-on-one session with a tutor to talk through your study questions.
           </p>
-          <BookButton />
+          {bookButton}
         </CardContent>
       </Card>
     )
@@ -50,7 +61,7 @@ export function ConsultationList({ items }: { items: Consultation[] }) {
             Needs your update
           </h2>
           <ul className="grid gap-3">
-            <Rows items={needsUpdate} state="needs_update" note="Did this happen?" />
+            <Rows items={needsUpdate} state="needs_update" note="Did this happen?" occupied={occupied} />
           </ul>
         </section>
       )}
@@ -61,11 +72,11 @@ export function ConsultationList({ items }: { items: Consultation[] }) {
         {upcoming.length === 0 ? (
           <div className="grid justify-items-start gap-3">
             <p className="text-sm text-muted-foreground">Nothing booked yet</p>
-            <BookButton />
+            {bookButton}
           </div>
         ) : (
           <ul className="grid gap-3">
-            <Rows items={upcoming} state="upcoming" />
+            <Rows items={upcoming} state="upcoming" occupied={occupied} />
           </ul>
         )}
       </section>
@@ -74,12 +85,12 @@ export function ConsultationList({ items }: { items: Consultation[] }) {
           <h2 className="text-lg font-semibold">History</h2>
           {history.completed.length > 0 && (
             <ul className="grid gap-3">
-              <Rows items={history.completed} state="completed" />
+              <Rows items={history.completed} state="completed" occupied={occupied} />
             </ul>
           )}
           {history.cancelled.length > 0 && (
             <CancelledToggle count={history.cancelled.length}>
-              <Rows items={history.cancelled} state="cancelled" />
+              <Rows items={history.cancelled} state="cancelled" occupied={occupied} />
             </CancelledToggle>
           )}
         </section>

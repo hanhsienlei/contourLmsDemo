@@ -1,0 +1,225 @@
+'use client'
+
+import { useState } from 'react'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { apiFetch } from '@/lib/api/client'
+import { createConsultationSchema, type CreateConsultationInput } from '@/lib/consultations/schema'
+import type { Consultation } from '@/lib/consultations/service'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { formatSlot } from './format'
+import { SlotPicker } from './slot-picker'
+import { useApiAction } from './use-api-action'
+
+const REASON_MAX = createConsultationSchema.shape.reason.maxLength ?? undefined
+
+type Common = { open: boolean; onOpenChange(open: boolean): void; occupied: Set<number> }
+
+type Props =
+  | (Common & { mode: 'book'; defaults: { firstName: string; lastName: string } })
+  | (Common & { mode: 'reschedule'; item: Consultation })
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="text-sm text-destructive">
+      {message}
+    </p>
+  )
+}
+
+/** Props that tie an input to its error text (and any helper text) for assistive tech. */
+const errorProps = (id: string, message?: string, helpId?: string) => ({
+  'aria-invalid': message ? true : undefined,
+  'aria-describedby': [helpId, message ? `${id}-error` : undefined].filter(Boolean).join(' ') || undefined,
+})
+
+function Field({
+  label,
+  id,
+  error,
+  children,
+}: {
+  label: string
+  id: string
+  error?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      <FieldError id={`${id}-error`} message={error} />
+    </div>
+  )
+}
+
+function CancelButton({ disabled }: { disabled: boolean }) {
+  return (
+    <DialogClose asChild>
+      <Button type="button" variant="outline" disabled={disabled}>
+        Cancel
+      </Button>
+    </DialogClose>
+  )
+}
+
+function BookForm({
+  occupied,
+  defaults,
+  onDone,
+}: {
+  occupied: Set<number>
+  defaults: { firstName: string; lastName: string }
+  onDone(): void
+}) {
+  const { pending, run } = useApiAction()
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateConsultationInput>({
+    resolver: zodResolver(createConsultationSchema),
+    defaultValues: { ...defaults, reason: '', scheduledAt: '' },
+  })
+  const [reason, slot] = useWatch({ control, name: ['reason', 'scheduledAt'] })
+
+  const onSubmit = (body: CreateConsultationInput) =>
+    run(
+      () => apiFetch('/api/consultations', { method: 'POST', body }),
+      'Consultation booked',
+      onDone,
+    )
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5" noValidate>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="First name" id="firstName" error={errors.firstName?.message}>
+          <Input
+            id="firstName"
+            autoComplete="given-name"
+            {...errorProps('firstName', errors.firstName?.message)}
+            {...register('firstName')}
+          />
+        </Field>
+        <Field label="Last name" id="lastName" error={errors.lastName?.message}>
+          <Input
+            id="lastName"
+            autoComplete="family-name"
+            {...errorProps('lastName', errors.lastName?.message)}
+            {...register('lastName')}
+          />
+        </Field>
+      </div>
+      <Field label="Reason" id="reason" error={errors.reason?.message}>
+        <Textarea
+          id="reason"
+          rows={3}
+          placeholder="Go over my Methods SAC practice questions"
+          {...errorProps('reason', errors.reason?.message, 'reason-help')}
+          {...register('reason')}
+        />
+        <div className="flex justify-between gap-2 text-sm text-muted-foreground">
+          <p id="reason-help">What would you like help with?</p>
+          <p className="tabular-nums">
+            {reason.length}/{REASON_MAX}
+          </p>
+        </div>
+      </Field>
+      <fieldset className="grid gap-2" aria-describedby={errors.scheduledAt ? 'scheduledAt-error' : undefined}>
+        <legend className="mb-2 text-sm font-medium">When</legend>
+        <Controller
+          control={control}
+          name="scheduledAt"
+          render={({ field }) => <SlotPicker value={field.value} onChange={field.onChange} occupied={occupied} />}
+        />
+        <FieldError id="scheduledAt-error" message={errors.scheduledAt?.message} />
+      </fieldset>
+      <DialogFooter>
+        <CancelButton disabled={pending} />
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Booking…' : slot ? `Book for ${formatSlot(slot)}` : 'Book consultation'}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+function RescheduleForm({ item, occupied, onDone }: { item: Consultation; occupied: Set<number>; onDone(): void }) {
+  const { pending, run } = useApiAction()
+  const [slot, setSlot] = useState('')
+
+  const submit = () =>
+    run(
+      () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { scheduledAt: slot } }),
+      `Moved to ${formatSlot(slot)}`,
+      onDone,
+      { conflictHint: 'Refresh the page to see the latest.' },
+    )
+
+  return (
+    <div className="grid gap-5">
+      <fieldset className="grid gap-2">
+        <legend className="mb-2 text-sm font-medium">When</legend>
+        <SlotPicker value={slot} onChange={setSlot} occupied={occupied} currentIso={item.scheduledAt} />
+      </fieldset>
+      <DialogFooter>
+        <CancelButton disabled={pending} />
+        <Button onClick={submit} disabled={!slot || pending}>
+          {pending ? 'Rescheduling…' : slot ? `Move to ${formatSlot(slot)}` : 'Reschedule'}
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
+/**
+ * Book a new consultation or move an existing one. The content mounts only while open, so closing
+ * resets the form and times always render client-side.
+ */
+export function ConsultationDialog(props: Props) {
+  const { open, onOpenChange, occupied } = props
+  const close = () => onOpenChange(false)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"
+        {...(props.mode === 'book' ? { 'aria-describedby': undefined } : {})}
+      >
+        {props.mode === 'book' ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Book a consultation</DialogTitle>
+            </DialogHeader>
+            <BookForm occupied={occupied} defaults={props.defaults} onDone={close} />
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Reschedule consultation</DialogTitle>
+              <DialogDescription>
+                <span className="block font-medium text-foreground">{props.item.reason}</span>
+                <span className="block">Currently {formatSlot(props.item.scheduledAt)}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <RescheduleForm item={props.item} occupied={occupied} onDone={close} />
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}

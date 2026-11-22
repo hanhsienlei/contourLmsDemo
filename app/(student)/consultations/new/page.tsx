@@ -1,13 +1,8 @@
-import { BookingForm } from '@/components/consultations/booking-form'
+import { redirect } from 'next/navigation'
 import { requireRolePage } from '@/lib/auth/guards'
 
+/** Booking lives in a dialog on the dashboard now; keep old links working. */
 export default async function NewConsultationPage() {
   await requireRolePage('student')
-
-  return (
-    <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">Book a consultation</h1>
-      <BookingForm />
-    </div>
-  )
+  redirect('/dashboard?book=1')
 }
