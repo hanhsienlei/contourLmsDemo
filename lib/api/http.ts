@@ -72,7 +72,11 @@ export function handle<A extends unknown[]>(
       return await fn(...a);
     } catch (e) {
       unstable_rethrow(e);
-      if (e instanceof ApiError) return errorResponse(e.status, e.code, e.message);
+      if (e instanceof ApiError) {
+        // Never surface internal detail on a 5xx, whatever the thrower wrote.
+        const message = e.status >= 500 ? 'Something went wrong' : e.message;
+        return errorResponse(e.status, e.code, message);
+      }
       if (e instanceof ZodError) {
         return errorResponse(400, 'validation', e.issues[0]?.message ?? 'Invalid request');
       }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { errors, mapDbError, assertSameOrigin, parseJson, handle } from '@/lib/api/http';
+import { ApiError, errors, mapDbError, assertSameOrigin, parseJson, handle } from '@/lib/api/http';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -92,6 +92,13 @@ describe('handle', () => {
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).not.toContain('leaked');
     expect(spy).toHaveBeenCalled();
+  });
+  it('forces a generic message for ApiError 5xx', async () => {
+    const res = await handle(async () => {
+      throw new ApiError(500, 'internal', 'connection to 10.0.0.5 refused');
+    })();
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: { code: 'internal', message: 'Something went wrong' } });
   });
   it('passes through success', async () => {
     const res = await handle(async (x: number) => Response.json({ x }))(5);
