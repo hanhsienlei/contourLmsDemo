@@ -50,6 +50,9 @@ export async function updateSession(request: NextRequest) {
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
+    // API routes answer for themselves with a 401 JSON body; a redirect to
+    // an HTML page would look like a success to fetch().
+    !request.nextUrl.pathname.startsWith("/api/") &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

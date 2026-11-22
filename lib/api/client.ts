@@ -18,7 +18,15 @@ export async function apiFetch<T>(path: string, init: Init = {}): Promise<T> {
     headers: { 'content-type': 'application/json' },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   })
+  // A followed redirect (e.g. to the login page) or a non-JSON 2xx is never a
+  // real API success.
+  if (res.redirected) {
+    throw new ApiClientError(401, 'unauthenticated', 'Please sign in again')
+  }
   const data = await res.json().catch(() => null)
+  if (res.ok && !(res.headers.get('content-type') ?? '').includes('application/json')) {
+    throw new ApiClientError(res.status, 'internal', 'Something went wrong')
+  }
   if (!res.ok) {
     const e = data?.error
     throw new ApiClientError(

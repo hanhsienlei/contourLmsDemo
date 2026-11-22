@@ -56,4 +56,23 @@ describe('apiFetch', () => {
     expect(err.status).toBe(500)
     expect(err.code).toBe('internal')
   })
+
+  it('rejects when the response was redirected (signed out)', async () => {
+    const res = new Response('<html>login</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    })
+    Object.defineProperty(res, 'redirected', { value: true })
+    stubFetch(res)
+    const err = await rejection(apiFetch('/api/consultations', { method: 'POST', body: {} }))
+    expect(err).toBeInstanceOf(ApiClientError)
+    expect(err.status).toBe(401)
+    expect(err.code).toBe('unauthenticated')
+  })
+
+  it('rejects a 2xx that is not JSON', async () => {
+    stubFetch(new Response('<html>ok</html>', { status: 200, headers: { 'content-type': 'text/html' } }))
+    const err = await rejection(apiFetch('/api/consultations'))
+    expect(err.code).toBe('internal')
+  })
 })
