@@ -127,3 +127,27 @@ export function actionsFor(state: DisplayState): { visible: RowAction[]; menu: R
       return { visible: [], menu: [] };
   }
 }
+
+/** Actions that open a dialog (the others run inline). */
+export type DialogAction = Extract<RowAction, 'reschedule' | 'cancel'>;
+const isDialogAction = (a: RowAction): a is DialogAction => a === 'reschedule' || a === 'cancel';
+
+export type RowLayout = {
+  primary?: RowAction;
+  /** Dialog buttons from `sm` up, mirrored as menu items below `sm`. */
+  secondary: DialogAction[];
+  /** Dialog actions that appear only in the ⋯ menu. */
+  menuOnly: DialogAction[];
+  /** When the ⋯ trigger shows: never, below `sm` (mirrored items only), or always (has menu-only items). */
+  menuVisibility: 'never' | 'below-sm' | 'always';
+};
+
+/** How a row lays out its actions between visible buttons and the ⋯ menu. */
+export function rowLayout(state: DisplayState): RowLayout {
+  const { visible, menu } = actionsFor(state);
+  const [primary, ...secondary] = visible;
+  const dialogSecondary = secondary.filter(isDialogAction);
+  const menuOnly = menu.filter(isDialogAction);
+  const menuVisibility = menuOnly.length > 0 ? 'always' : dialogSecondary.length > 0 ? 'below-sm' : 'never';
+  return { primary, secondary: dialogSecondary, menuOnly, menuVisibility };
+}

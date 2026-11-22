@@ -12,6 +12,7 @@ import {
   activeSlotKeys,
   prefillName,
   actionsFor,
+  rowLayout,
 } from '@/lib/consultations/display';
 import type { ConsultationStatus } from '@/lib/consultations/rules';
 
@@ -236,5 +237,43 @@ describe('actionsFor', () => {
     expect(actionsFor('needs_update')).toEqual({ visible: ['complete', 'reschedule'], menu: ['cancel'] });
     expect(actionsFor('completed')).toEqual({ visible: ['incomplete'], menu: [] });
     expect(actionsFor('cancelled')).toEqual({ visible: [], menu: [] });
+  });
+});
+
+describe('rowLayout', () => {
+  it('upcoming: complete is primary, the rest are buttons mirrored in the menu below sm', () => {
+    expect(rowLayout('upcoming')).toEqual({
+      primary: 'complete',
+      secondary: ['reschedule', 'cancel'],
+      menuOnly: [],
+      menuVisibility: 'below-sm',
+    });
+  });
+
+  it('needs_update: cancel lives only in the menu, which is always shown', () => {
+    expect(rowLayout('needs_update')).toEqual({
+      primary: 'complete',
+      secondary: ['reschedule'],
+      menuOnly: ['cancel'],
+      menuVisibility: 'always',
+    });
+  });
+
+  it('completed: only the primary action, no menu', () => {
+    expect(rowLayout('completed')).toEqual({
+      primary: 'incomplete',
+      secondary: [],
+      menuOnly: [],
+      menuVisibility: 'never',
+    });
+  });
+
+  it('cancelled: nothing to do, no menu', () => {
+    expect(rowLayout('cancelled')).toEqual({
+      primary: undefined,
+      secondary: [],
+      menuOnly: [],
+      menuVisibility: 'never',
+    });
   });
 });

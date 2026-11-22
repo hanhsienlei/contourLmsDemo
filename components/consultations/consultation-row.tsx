@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { actionsFor, type DisplayState, type RowAction } from '@/lib/consultations/display'
+import { rowLayout, type DisplayState } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
@@ -32,14 +32,8 @@ export function ConsultationRow({
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null)
   const occupiedSet = useMemo(() => new Set(occupied), [occupied])
   const slot = useSlotLabel(item.scheduledAt)
-  const { visible, menu } = actionsFor(state)
-  const [primary, ...secondary] = visible
-  const dialogActions = (list: RowAction[]) => list.filter((a) => a === 'reschedule' || a === 'cancel')
-  const secondaryDialog = dialogActions(secondary)
-  const menuDialog = dialogActions(menu)
-  // The ⋯ trigger renders only where it has items: always for `menu`, below `sm` for mirrored secondary actions.
-  const showMenu = menuDialog.length > 0 || secondaryDialog.length > 0
-  const menuClass = menuDialog.length > 0 ? undefined : 'sm:hidden'
+  const { primary, secondary, menuOnly, menuVisibility } = rowLayout(state)
+  const menuClass = menuVisibility === 'below-sm' ? 'sm:hidden' : undefined
   const cancelled = state === 'cancelled'
 
   return (
@@ -60,35 +54,35 @@ export function ConsultationRow({
       <div className="flex shrink-0 items-center gap-2">
         <StatusBadge state={state} />
         {(primary === 'complete' || primary === 'incomplete') && <CompleteButton item={item} />}
-        {secondaryDialog.map((action) => (
+        {secondary.map((action) => (
           <Button
             key={action}
             variant="outline"
             size="sm"
             className="hidden sm:inline-flex"
             aria-label={slot ? `${LABEL[action]} consultation on ${slot}` : undefined}
-            onClick={() => setOpenDialog(action as OpenDialog)}
+            onClick={() => setOpenDialog(action)}
           >
             {LABEL[action]}
           </Button>
         ))}
-        {showMenu && (
+        {menuVisibility !== 'never' && (
           <RowActionsMenu slotLabel={slot} className={menuClass}>
-            {secondaryDialog.map((action) => (
+            {secondary.map((action) => (
               <DropdownMenuItem
                 key={action}
                 className="sm:hidden"
                 aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
-                onSelect={() => setOpenDialog(action as OpenDialog)}
+                onSelect={() => setOpenDialog(action)}
               >
                 {LABEL[action]}
               </DropdownMenuItem>
             ))}
-            {menuDialog.map((action) => (
+            {menuOnly.map((action) => (
               <DropdownMenuItem
                 key={action}
                 aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
-                onSelect={() => setOpenDialog(action as OpenDialog)}
+                onSelect={() => setOpenDialog(action)}
               >
                 {LABEL[action]}
               </DropdownMenuItem>
