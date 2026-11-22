@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 126 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 158 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -86,7 +86,7 @@ npm run db:types     # regenerate lib/supabase/database.types.ts from the local 
 
 The full list is in `docs/superpowers/specs/2026-11-22-ui-ux-refresh.md`.
 
-- D1: a past `scheduled` booking can still be cancelled, as the API allows. In the UI its main actions are Mark complete and Reschedule, and Cancel is in the ⋯ menu.
+- D1: a past `scheduled` booking can still be cancelled, as the API allows. In the UI its main actions are Mark complete and Reschedule, and Cancel is in the ⋯ menu. Upcoming bookings keep Cancel visible on desktop.
 - D2: the dashboard groups by display state (Needs your update, Upcoming, History), not by date alone.
 - D3: booking opens in a dialog from the dashboard. The old `/consultations/new` link redirects to `/dashboard?book=1`.
 - D4: there is no per-student booking cap, in the UI or the API.
