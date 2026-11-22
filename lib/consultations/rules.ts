@@ -93,3 +93,4 @@ const LAST_START = clockTime(CLOSE_HOUR * 60 - SLOT_MINUTES);
 export const HOURS_MESSAGE = `Consultations start between ${FIRST_START} and ${LAST_START} ${BUSINESS_ZONE_LABEL} time`;
 export const WINDOW_MESSAGE = `Consultations must be booked between ${MIN_LEAD_HOURS} hours and ${MAX_AHEAD_DAYS} days ahead`;
 export const BOOKING_RULES_SUMMARY = `${HOURS_MESSAGE}, ${MIN_LEAD_HOURS} hours to ${MAX_AHEAD_DAYS} days ahead.`;
+export const BOOKING_HELP = `Book ${MIN_LEAD_HOURS / 24} to ${MAX_AHEAD_DAYS} days ahead, ${FIRST_START} to ${LAST_START} ${BUSINESS_ZONE_LABEL} time.`;

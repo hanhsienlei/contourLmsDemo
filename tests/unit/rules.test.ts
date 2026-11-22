@@ -9,6 +9,7 @@ import {
   HOURS_MESSAGE,
   WINDOW_MESSAGE,
   BOOKING_RULES_SUMMARY,
+  BOOKING_HELP,
 } from '@/lib/consultations/rules';
 
 // 2030-01-01T09:07Z is 20:07 in Melbourne (AEDT, UTC+11).
@@ -110,5 +111,11 @@ describe('rule messages', () => {
     expect(BOOKING_RULES_SUMMARY).toBe(
       'Consultations start between 8:00 am and 7:45 pm Melbourne time, 24 hours to 14 days ahead.',
     );
+  });
+});
+
+describe('BOOKING_HELP', () => {
+  it('states the window and hours in plain words', () => {
+    expect(BOOKING_HELP).toBe('Book 1 to 14 days ahead, 8:00 am to 7:45 pm Melbourne time.');
   });
 });
