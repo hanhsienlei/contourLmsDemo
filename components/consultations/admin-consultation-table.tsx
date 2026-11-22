@@ -1,10 +1,11 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { displayState } from '@/lib/consultations/display'
 import type { AdminConsultation } from '@/lib/consultations/service'
 import { LocalTime } from './local-time'
 import { StatusBadge } from './status-badge'
 
 /** Read-only admin listing; cancelled rows are included and muted. */
-export function AdminConsultationTable({ items }: { items: AdminConsultation[] }) {
+export function AdminConsultationTable({ items, now }: { items: AdminConsultation[]; now: Date }) {
   return (
     <Table>
       <caption className="sr-only">All consultations</caption>
@@ -38,7 +39,7 @@ export function AdminConsultationTable({ items }: { items: AdminConsultation[] }
               <LocalTime iso={item.scheduledAt} />
             </TableCell>
             <TableCell>
-              <StatusBadge status={item.status} />
+              <StatusBadge state={displayState(item, now)} />
             </TableCell>
           </TableRow>
         ))}

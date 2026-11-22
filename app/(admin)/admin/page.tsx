@@ -34,11 +34,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   }
 
   const { items, nextCursor } = await listAll(q)
+  // Rendered once per request, so the current time is stable.
+  const now = new Date()
 
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">All consultations</h1>
-      <AdminConsultationTable items={items} />
+      <AdminConsultationTable items={items} now={now} />
       <nav aria-label="Pagination" className="flex gap-4">
         {q.cursor && (
           <Link href="/admin" className="underline underline-offset-4">
