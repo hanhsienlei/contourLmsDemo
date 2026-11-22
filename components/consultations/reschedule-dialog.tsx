@@ -1,0 +1,61 @@
+'use client'
+
+import { useState } from 'react'
+import { apiFetch } from '@/lib/api/client'
+import type { Consultation } from '@/lib/consultations/service'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { LocalTime } from './local-time'
+import { SlotPicker } from './slot-picker'
+import { useApiAction } from './use-api-action'
+
+export function RescheduleDialog({ item }: { item: Consultation }) {
+  const [open, setOpen] = useState(false)
+  const [slot, setSlot] = useState('')
+  const { pending, run } = useApiAction()
+
+  const submit = () =>
+    run(
+      () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { scheduledAt: slot } }),
+      'Consultation rescheduled',
+      () => setOpen(false),
+    )
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setSlot('')
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          Reschedule
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reschedule consultation</DialogTitle>
+          <DialogDescription>
+            Currently <LocalTime iso={item.scheduledAt} />. Pick a new slot.
+          </DialogDescription>
+        </DialogHeader>
+        <SlotPicker value={slot} onChange={setSlot} />
+        <DialogFooter>
+          <Button onClick={submit} disabled={!slot || pending}>
+            {pending ? 'Rescheduling…' : 'Reschedule'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

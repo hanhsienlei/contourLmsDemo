@@ -1,3 +1,22 @@
-export default function DashboardPage() {
-  return <h1 className="text-2xl font-semibold">Dashboard</h1>;
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { ConsultationList } from '@/components/consultations/consultation-list'
+import { requireRolePage } from '@/lib/auth/guards'
+import { listOwn } from '@/lib/consultations/service'
+
+export default async function DashboardPage() {
+  const { userId } = await requireRolePage('student')
+  const items = await listOwn(userId)
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">Your consultations</h1>
+        <Button asChild>
+          <Link href="/consultations/new">Book a consultation</Link>
+        </Button>
+      </div>
+      <ConsultationList items={items} />
+    </div>
+  )
 }
