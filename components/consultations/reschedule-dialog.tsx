@@ -67,7 +67,7 @@ export function RescheduleDialog({
             Currently <LocalTime iso={item.scheduledAt} />. Pick a new slot.
           </DialogDescription>
         </DialogHeader>
-        <SlotPicker value={slot} onChange={setSlot} />
+        <SlotPicker value={slot} onChange={setSlot} currentIso={item.scheduledAt} />
         <DialogFooter>
           <Button onClick={submit} disabled={!slot || pending}>
             {pending ? 'Rescheduling…' : 'Reschedule'}

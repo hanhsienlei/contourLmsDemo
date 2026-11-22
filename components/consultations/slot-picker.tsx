@@ -2,18 +2,23 @@
 
 import { useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { BOOKING_RULES_SUMMARY, availableSlots } from '@/lib/consultations/rules'
+import { BOOKING_HELP, availableSlots } from '@/lib/consultations/rules'
+import { dayKey, groupSlotsByPeriod, initialDay } from '@/lib/consultations/display'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TimeZoneNote } from './time-zone-note'
 import { useMounted } from './use-mounted'
 
 type Props = {
   value?: string
   onChange(iso: string): void
   now?: Date
+  /** Epoch ms of slots the student already has booked. */
+  occupied?: Set<number>
+  /** The consultation's current time (reschedule); shown as "Current". */
+  currentIso?: string
 }
-
-const dayKey = (d: Date) => format(d, 'yyyy-MM-dd')
 
 function groupByLocalDay(slots: Date[]): Map<string, Date[]> {
   const days = new Map<string, Date[]>()
@@ -25,7 +30,7 @@ function groupByLocalDay(slots: Date[]): Map<string, Date[]> {
 }
 
 /** Day + time selects over the bookable window. `now` is read on the client after mount to avoid hydration drift. */
-export function SlotPicker({ value, onChange, now }: Props) {
+export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props) {
   const mounted = useMounted()
   const id = useId()
   const days = useMemo(
@@ -33,17 +38,20 @@ export function SlotPicker({ value, onChange, now }: Props) {
     [mounted, now],
   )
   const [pickedDay, setPickedDay] = useState<string>()
-  const day = pickedDay ?? (value ? dayKey(new Date(value)) : undefined)
-
   if (!days) return <div className="h-9" aria-hidden />
+
+  const day = pickedDay ?? (value ? dayKey(new Date(value)) : initialDay([...days.keys()], currentIso))
 
   const times = (day && days.get(day)) || []
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <p id={`${id}-hint`} className="text-sm text-muted-foreground sm:col-span-2">
-        {BOOKING_RULES_SUMMARY} Times are shown in your local time.
-      </p>
+      <div className="grid gap-1 sm:col-span-2">
+        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+          {BOOKING_HELP}
+        </p>
+        <TimeZoneNote />
+      </div>
       <div className="grid gap-2">
         <Label htmlFor={`${id}-day`}>Day</Label>
         <Select
@@ -65,20 +73,50 @@ export function SlotPicker({ value, onChange, now }: Props) {
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-time`}>Time</Label>
-        <Select value={value ?? ''} onValueChange={onChange} disabled={!day}>
-          <SelectTrigger id={`${id}-time`} className="w-full">
-            <SelectValue placeholder="Choose a time" />
-          </SelectTrigger>
-          <SelectContent>
-            {times.map((slot) => (
-              <SelectItem key={slot.toISOString()} value={slot.toISOString()}>
-                {format(slot, 'h:mm aaa')}
-              </SelectItem>
+      <div className="grid gap-2 sm:col-span-2">
+        <Label id={`${id}-time`}>Time</Label>
+        {!day ? (
+          <p className="text-sm text-muted-foreground">Choose a day first</p>
+        ) : (
+          <div role="group" aria-labelledby={`${id}-time`} className="grid gap-3">
+            {groupSlotsByPeriod(times).map(({ period, slots }) => (
+              <div key={period} className="grid gap-1.5">
+                <p className="text-xs font-medium text-muted-foreground">{period}</p>
+                <div className="flex flex-wrap gap-2">
+                  {slots.map((slot) => {
+                    const iso = slot.toISOString()
+                    const ms = slot.getTime()
+                    const isCurrent = currentIso !== undefined && Date.parse(currentIso) === ms
+                    const isOccupied = !isCurrent && !!occupied?.has(ms)
+                    const selected = !!value && Date.parse(value) === ms
+                    const label = format(slot, 'h:mm aaa')
+                    return (
+                      <Button
+                        key={iso}
+                        type="button"
+                        size="sm"
+                        variant={selected ? 'default' : 'outline'}
+                        aria-pressed={selected}
+                        disabled={isCurrent || isOccupied}
+                        title={
+                          isCurrent
+                            ? 'Your current time'
+                            : isOccupied
+                              ? 'You already have a booking at this time'
+                              : undefined
+                        }
+                        className={isOccupied ? 'line-through' : undefined}
+                        onClick={() => onChange(iso)}
+                      >
+                        {isCurrent ? `${label} · Current` : label}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
             ))}
-          </SelectContent>
-        </Select>
+          </div>
+        )}
       </div>
     </div>
   )
