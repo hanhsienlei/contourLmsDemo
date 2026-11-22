@@ -129,6 +129,49 @@ describe('changes by id', () => {
   })
 })
 
+describe('origin check runs before auth', () => {
+  const evil = { origin: 'http://evil.example' }
+  it('POST create, no session, bad origin -> 403 not 401', async () => {
+    session.current = null
+    const res = await createPost(req('POST', '/api/consultations', body(), evil))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error.code).toBe('forbidden')
+  })
+  it('PATCH by id, no session, bad origin -> 403 not 401', async () => {
+    session.current = null
+    const id = '00000000-0000-4000-8000-000000000000'
+    const res = await patchById(req('PATCH', `/api/consultations/${id}`, { completed: true }, evil), ctx(id))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error.code).toBe('forbidden')
+  })
+  it('cancel, no session, bad origin -> 403 not 401', async () => {
+    session.current = null
+    const id = '00000000-0000-4000-8000-000000000000'
+    const res = await cancelPost(req('POST', `/api/consultations/${id}/cancel`, {}, evil), ctx(id))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error.code).toBe('forbidden')
+  })
+})
+
+describe('extra validation', () => {
+  const id = '00000000-0000-4000-8000-000000000000'
+  it('PATCH with both keys -> 400', async () => {
+    session.current = A
+    const res = await patchById(req('PATCH', `/api/consultations/${id}`, { completed: true, scheduledAt: slot() }), ctx(id))
+    expect(res.status).toBe(400)
+  })
+  it('PATCH with {} -> 400', async () => {
+    session.current = A
+    const res = await patchById(req('PATCH', `/api/consultations/${id}`, {}), ctx(id))
+    expect(res.status).toBe(400)
+  })
+  it('cancel with non-uuid -> 400', async () => {
+    session.current = A
+    const res = await cancelPost(req('POST', '/api/consultations/nope/cancel', {}), ctx('nope'))
+    expect(res.status).toBe(400)
+  })
+})
+
 describe('admin list', () => {
   it('student -> 403', async () => {
     session.current = A
