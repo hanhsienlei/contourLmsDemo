@@ -17,8 +17,23 @@ import {
 import { LocalTime, useSlotLabel } from './local-time'
 import { useApiAction } from './use-api-action'
 
-export function CancelDialog({ item }: { item: Consultation }) {
-  const [open, setOpen] = useState(false)
+export function CancelDialog({
+  item,
+  open: openProp,
+  onOpenChange,
+  trigger = true,
+}: {
+  item: Consultation
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  trigger?: boolean
+}) {
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = (next: boolean) => {
+    setOpenState(next)
+    onOpenChange?.(next)
+  }
   const label = useSlotLabel(item.scheduledAt)
   const { pending, run } = useApiAction()
 
@@ -31,11 +46,13 @@ export function CancelDialog({ item }: { item: Consultation }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={label ? `Cancel consultation on ${label}` : undefined}>
-          Cancel
-        </Button>
-      </AlertDialogTrigger>
+      {trigger && (
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" size="sm" aria-label={label ? `Cancel consultation on ${label}` : undefined}>
+            Cancel
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Cancel this consultation?</AlertDialogTitle>

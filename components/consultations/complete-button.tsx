@@ -11,7 +11,7 @@ export function CompleteButton({ item }: { item: Consultation }) {
   const slot = useSlotLabel(item.scheduledAt)
   const completed = item.status === 'completed'
   const text = completed ? 'Mark incomplete' : 'Mark complete'
-  const ariaLabel = slot ? `Mark consultation on ${slot} ${completed ? 'incomplete' : 'complete'}` : text
+  const ariaLabel = slot ? `${text}, consultation on ${slot}` : text
 
   return (
     <Button

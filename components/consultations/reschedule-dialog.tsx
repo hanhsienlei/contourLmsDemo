@@ -17,8 +17,23 @@ import { LocalTime, useSlotLabel } from './local-time'
 import { SlotPicker } from './slot-picker'
 import { useApiAction } from './use-api-action'
 
-export function RescheduleDialog({ item }: { item: Consultation }) {
-  const [open, setOpen] = useState(false)
+export function RescheduleDialog({
+  item,
+  open: openProp,
+  onOpenChange,
+  trigger = true,
+}: {
+  item: Consultation
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  trigger?: boolean
+}) {
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = (next: boolean) => {
+    setOpenState(next)
+    onOpenChange?.(next)
+  }
   const [slot, setSlot] = useState('')
   const label = useSlotLabel(item.scheduledAt)
   const { pending, run } = useApiAction()
@@ -38,11 +53,13 @@ export function RescheduleDialog({ item }: { item: Consultation }) {
         if (!next) setSlot('')
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={label ? `Reschedule consultation on ${label}` : undefined}>
-          Reschedule
-        </Button>
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" aria-label={label ? `Reschedule consultation on ${label}` : undefined}>
+            Reschedule
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Reschedule consultation</DialogTitle>
