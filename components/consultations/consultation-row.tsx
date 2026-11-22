@@ -3,7 +3,13 @@
 import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { rowLayout, type DialogAction, type DisplayState } from '@/lib/consultations/display'
+import {
+  ROW_ACTION_LABEL,
+  actionAriaLabel,
+  rowLayout,
+  type DialogAction,
+  type DisplayState,
+} from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
@@ -14,8 +20,6 @@ import { RowActionsMenu } from './row-actions-menu'
 import { StatusBadge } from './status-badge'
 
 type OpenDialog = 'reschedule' | 'cancel' | null
-
-const LABEL: Record<'reschedule' | 'cancel', string> = { reschedule: 'Reschedule', cancel: 'Cancel' }
 
 export function ConsultationRow({
   item,
@@ -65,24 +69,21 @@ export function ConsultationRow({
         <p className="truncate font-medium" title={item.reason}>
           {item.reason}
         </p>
-        <div className="flex flex-wrap items-center gap-x-2 text-sm">
-          <ConsultationTime iso={item.scheduledAt} />
-          {note && <span className="text-muted-foreground">{note}</span>}
-        </div>
+        <ConsultationTime iso={item.scheduledAt} note={note} />
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
         <StatusBadge state={state} />
-        {(primary === 'complete' || primary === 'incomplete') && <CompleteButton item={item} />}
+        {(primary === 'complete' || primary === 'incomplete') && <CompleteButton item={item} action={primary} />}
         {secondary.map((action) => (
           <Button
             key={action}
             variant="outline"
             size="sm"
             className="hidden sm:inline-flex"
-            aria-label={slot ? `${LABEL[action]} consultation on ${slot}` : undefined}
+            aria-label={actionAriaLabel(action, slot)}
             onClick={(e) => openFromButton(action, e.currentTarget)}
           >
-            {LABEL[action]}
+            {ROW_ACTION_LABEL[action]}
           </Button>
         ))}
         {menuVisibility !== 'never' && (
@@ -100,19 +101,19 @@ export function ConsultationRow({
               <DropdownMenuItem
                 key={action}
                 className="sm:hidden"
-                aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
+                aria-label={actionAriaLabel(action, slot)}
                 onSelect={() => openFromMenu(action)}
               >
-                {LABEL[action]}
+                {ROW_ACTION_LABEL[action]}
               </DropdownMenuItem>
             ))}
             {menuOnly.map((action) => (
               <DropdownMenuItem
                 key={action}
-                aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
+                aria-label={actionAriaLabel(action, slot)}
                 onSelect={() => openFromMenu(action)}
               >
-                {LABEL[action]}
+                {ROW_ACTION_LABEL[action]}
               </DropdownMenuItem>
             ))}
           </RowActionsMenu>

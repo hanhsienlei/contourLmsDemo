@@ -8,7 +8,8 @@ import { ApiClientError } from '@/lib/api/client'
 /**
  * Runs one API request at a time: toast on success/failure, refresh server data on success.
  * Callers react to success (close a dialog, navigate) through `onSuccess`.
- * `conflictHint` is shown under the server message when the API answers 409.
+ * `conflictHint` is shown under the server message when the API answers 409. The API uses 409 both for a
+ * taken slot and for a booking changed elsewhere, so the hint must read correctly for either.
  */
 export function useApiAction() {
   const router = useRouter()

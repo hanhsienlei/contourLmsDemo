@@ -13,6 +13,8 @@ import {
   prefillName,
   actionsFor,
   rowLayout,
+  ROW_ACTION_LABEL,
+  actionAriaLabel,
 } from '@/lib/consultations/display';
 import type { ConsultationStatus } from '@/lib/consultations/rules';
 
@@ -275,5 +277,29 @@ describe('rowLayout', () => {
       menuOnly: [],
       menuVisibility: 'never',
     });
+  });
+});
+
+describe('ROW_ACTION_LABEL', () => {
+  it('has the visible text for every row action', () => {
+    expect(ROW_ACTION_LABEL).toEqual({
+      complete: 'Mark complete',
+      incomplete: 'Mark incomplete',
+      reschedule: 'Reschedule',
+      cancel: 'Cancel',
+    });
+  });
+});
+
+describe('actionAriaLabel', () => {
+  it('starts with the visible text and names the slot', () => {
+    expect(actionAriaLabel('cancel', 'Mon 12 Jan, 9:00 am')).toBe('Cancel, consultation on Mon 12 Jan, 9:00 am');
+    expect(actionAriaLabel('complete', 'Mon 12 Jan, 9:00 am')).toBe(
+      'Mark complete, consultation on Mon 12 Jan, 9:00 am',
+    );
+  });
+
+  it('is undefined before the slot label is known, so the visible text is the name', () => {
+    expect(actionAriaLabel('reschedule', '')).toBeUndefined();
   });
 });

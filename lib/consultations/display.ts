@@ -114,6 +114,22 @@ export function prefillName(
 
 export type RowAction = 'complete' | 'incomplete' | 'reschedule' | 'cancel';
 
+/** Visible text of each row action's button or menu item. */
+export const ROW_ACTION_LABEL: Record<RowAction, string> = {
+  complete: 'Mark complete',
+  incomplete: 'Mark incomplete',
+  reschedule: 'Reschedule',
+  cancel: 'Cancel',
+};
+
+/**
+ * Accessible name for a row action: the visible text first, then the slot, so voice control still
+ * matches what is on screen. Undefined until the slot label is known (the visible text is the name).
+ */
+export function actionAriaLabel(action: RowAction, slotLabel: string): string | undefined {
+  return slotLabel ? `${ROW_ACTION_LABEL[action]}, consultation on ${slotLabel}` : undefined;
+}
+
 /** Row actions for a display state. The primary action is `visible[0]`; `menu` holds the rest. */
 export function actionsFor(state: DisplayState): { visible: RowAction[]; menu: RowAction[] } {
   switch (state) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { apiFetch } from '@/lib/api/client'
+import { ROW_ACTION_LABEL, actionAriaLabel } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { Button } from '@/components/ui/button'
 import {
@@ -55,8 +56,8 @@ export function CancelDialog({
     <AlertDialog open={open} onOpenChange={(next) => (next || !pending) && setOpen(next)}>
       {trigger && (
         <AlertDialogTrigger asChild>
-          <Button variant="outline" size="sm" aria-label={label ? `Cancel consultation on ${label}` : undefined}>
-            Cancel
+          <Button variant="outline" size="sm" aria-label={actionAriaLabel('cancel', label)}>
+            {ROW_ACTION_LABEL.cancel}
           </Button>
         </AlertDialogTrigger>
       )}

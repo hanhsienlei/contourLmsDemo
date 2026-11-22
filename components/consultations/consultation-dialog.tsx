@@ -185,7 +185,7 @@ function RescheduleForm({
       () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { scheduledAt: slot } }),
       `Moved to ${formatSlot(slot)}`,
       onDone,
-      { conflictHint: 'Refresh the page to see the latest.' },
+      { conflictHint: 'Refresh the page to see the latest bookings.' },
     )
 
   return (

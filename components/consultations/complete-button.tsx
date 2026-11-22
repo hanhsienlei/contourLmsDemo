@@ -1,32 +1,32 @@
 'use client'
 
 import { apiFetch } from '@/lib/api/client'
+import { ROW_ACTION_LABEL, actionAriaLabel } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { Button } from '@/components/ui/button'
 import { useSlotLabel } from './local-time'
 import { useApiAction } from './use-api-action'
 
-export function CompleteButton({ item }: { item: Consultation }) {
+/** The row's primary action; `action` comes from `rowLayout`, so the row decides which way it toggles. */
+export function CompleteButton({ item, action }: { item: Consultation; action: 'complete' | 'incomplete' }) {
   const { pending, run } = useApiAction()
   const slot = useSlotLabel(item.scheduledAt)
-  const completed = item.status === 'completed'
-  const text = completed ? 'Mark incomplete' : 'Mark complete'
-  const ariaLabel = slot ? `${text}, consultation on ${slot}` : text
+  const completing = action === 'complete'
 
   return (
     <Button
       variant="outline"
       size="sm"
       disabled={pending}
-      aria-label={ariaLabel}
+      aria-label={actionAriaLabel(action, slot)}
       onClick={() =>
         run(
-          () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { completed: !completed } }),
-          completed ? 'Marked incomplete' : 'Marked complete',
+          () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { completed: completing } }),
+          completing ? 'Marked complete' : 'Marked incomplete',
         )
       }
     >
-      {text}
+      {ROW_ACTION_LABEL[action]}
     </Button>
   )
 }
