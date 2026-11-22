@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 102 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 116 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -279,6 +279,7 @@ The service holds a key that bypasses RLS, so the code follows these rules:
    `@supabase/ssr` session cookies are readable by JavaScript, so limiting XSS protects the session. React escapes user text, and the code never uses `dangerouslySetInnerHTML`. The CSP still allows `'unsafe-inline'` scripts, which Next.js needs without a nonce setup.
 10. The seed script only runs locally: it deletes users with the secret key, so `scripts/local-guard.ts` aborts unless the URL host is `localhost` or `127.0.0.1`. A unit test covers this.
 11. Secrets stay out of git: `.env*.local` is ignored, and `.env.example` holds placeholders only.
+12. No open redirect after email confirmation: `app/auth/confirm` passes its `next` parameter through `safeNextPath` (`lib/auth/safe-redirect.ts`). It accepts only a same-site path. It rejects absolute URLs, `//host`, backslashes and control characters, because browsers strip tab and newline, which turns `/%09/evil.com` into `//evil.com`. Anything else falls back to `/`. A unit test covers each bypass.
 
 Grants are locked by default for objects created by `postgres` (what migrations run as). Besides revoking privileges on the three tables, the init migration runs `alter default privileges ... in schema public revoke all` for tables and sequences. A second migration (`lock_function_defaults`) also revokes the global `PUBLIC` EXECUTE default on functions, because a revoke scoped to one schema doesn't remove it. `tests/integration/schema.test.ts` checks that every table in `public` has RLS enabled, and creates a throwaway function and table in a rolled-back transaction to prove `anon` and `authenticated` get no access to them. Defaults that the platform's own `supabase_admin` role sets in `public` are outside the migrations' control, so objects created by that role (for example by Supabase extensions) may still be granted to the API roles. Review those separately.
 
