@@ -287,6 +287,8 @@ These rules are needed because the service holds a key that bypasses RLS. One ca
 
 ## 10. UI (shadcn/ui, built with the frontend and design skills)
 
+> Superseded in part by `2026-11-22-ui-ux-refresh.md`. Where this section and the refresh spec differ, the refresh spec wins.
+
 - `/auth/*`: the template's login, sign-up and logout. **Sign-up change:** confirmations are off locally, so the user goes straight to `/` after sign-up. The template's "check your email" success page is removed, or no longer linked.
 - `/dashboard` (student): upcoming and past consultations, split by `scheduled_at` against now. Each row has a complete checkbox, Reschedule (dialog) and Cancel (with confirmation). Cancelled rows are shown muted, with no actions.
 - `/consultations/new` (student): the booking form. It uses the **same `SlotPicker`** (date plus 15-minute time select, offering only slots 24 hours to 14 days from now, within business hours, shown in the browser's local time under a one-line note of the rules) as the reschedule dialog.
@@ -422,7 +424,7 @@ Items that don't fit become "with more time" notes in the README, and the spec r
 
 - **No role row:** this fails closed (§8).
 - **Booking window:** a rolling 24 hours to 14 days from now, not calendar days. The values are constants.
-- **Upcoming vs past:** split by date, whatever the status.
+- **Upcoming vs past:** split by date, whatever the status. Superseded by D2 in the UI refresh spec: the student dashboard now groups by display state.
 - **A past `scheduled` booking can be cancelled.**
 - **Email confirmation is off locally**, and sign-up goes straight to `/`.
 - **Admins don't book.**

@@ -77,10 +77,21 @@ npm run db:types     # regenerate lib/supabase/database.types.ts from the local 
 ### Features
 
 - Sign up, log in and log out with Supabase Auth (from the `with-supabase` template).
-- `/dashboard` (student): your consultations, split into upcoming and past by date. Each row has a completed checkbox, a Reschedule dialog and a Cancel dialog with confirmation. Cancelled rows are muted and have no actions.
-- `/consultations/new` (student): booking form with first name, last name, reason and a date plus 15-minute time picker. The picker offers only slots inside the booking window. The reschedule dialog uses the same picker.
-- `/admin` (admin): read-only table of all consultations, including cancelled ones, with the account email. Keyset paginated, 20 per page.
+- `/dashboard` (student): your consultations, grouped by display state: Needs your update, Upcoming and History. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation. Cancelled rows are muted, have no actions and sit behind "Show cancelled (n)" in History. A "Book a consultation" button opens the booking dialog.
+- Booking dialog (student): first name, last name, reason and a day plus a grid of 15-minute slots. The slots are limited to the booking window. The reschedule dialog is the same component in a second mode. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog.
+- `/admin` (admin): read-only table of all consultations, including cancelled ones, with the student's name, the account email and a display-state badge. Keyset paginated, 20 per page, with First page and Next page buttons. There is no total count, because keyset pagination doesn't produce one cheaply.
 - `/` redirects by role: admins to `/admin`, students to `/dashboard`. A user with no role row goes to `/no-access`.
+
+### UI decisions
+
+The full list is in `docs/superpowers/specs/2026-11-22-ui-ux-refresh.md`.
+
+- D1: a past `scheduled` booking can still be cancelled, as the API allows. In the UI its main actions are Mark complete and Reschedule, and Cancel is in the ⋯ menu.
+- D2: the dashboard groups by display state (Needs your update, Upcoming, History), not by date alone.
+- D3: booking opens in a dialog from the dashboard. The old `/consultations/new` link redirects to `/dashboard?book=1`.
+- D4: there is no per-student booking cap, in the UI or the API.
+- D5: times show in the browser's time zone, with an explicit label such as "Times in Adelaide time (ACDT)".
+- D6: booking and rescheduling share one dialog component with two modes.
 
 ### Architecture
 
@@ -220,7 +231,7 @@ Every student query includes `user_id = <verified user>`, so another student's b
 - At most 14 days ahead: high-school students rarely plan further out, and it caps how many future bookings one student can hold.
 - Both limits are rolling from now, not calendar days, so no time zone has to decide when "tomorrow" starts.
 - Consultations start between 8:00 am and 7:45 pm **Melbourne time** (`Australia/Melbourne`), on the quarter hour. The brief sets no hours, but a 1:30 am consultation can't be staffed. Contour is Melbourne-based, so the hours are pinned to that zone and daylight saving is handled by `Intl`. The picker shows the same hours converted to the student's local time, with a one-line note saying so.
-- The values are constants in `lib/consultations/rules.ts` (`MIN_LEAD_HOURS`, `MAX_AHEAD_DAYS`, `SLOT_MINUTES`, `BUSINESS_TIME_ZONE`, `OPEN_HOUR`, `CLOSE_HOUR`). The service enforces them, and the `SlotPicker` only offers slots that pass (both use the same `availableSlots` and `isWithinBusinessHours`), so a change is one line.
+- The values are constants in `lib/consultations/rules.ts` (`MIN_LEAD_HOURS`, `MAX_AHEAD_DAYS`, `SLOT_MINUTES`, `BUSINESS_TIME_ZONE`, `OPEN_HOUR`, `CLOSE_HOUR`). The service enforces them, and the `SlotPicker` (used by the booking and reschedule dialog) only offers slots that pass (both use the same `availableSlots` and `isWithinBusinessHours`), so a change is one line.
 - Validation messages are written for students ("First name is required", "Choose a day and time"), set in the shared zod schema that both the form and the API use.
 
 ## 4. Assumptions
@@ -228,7 +239,7 @@ Every student query includes `user_id = <verified user>`, so another student's b
 - A consultation is a one-to-one slot a student books for help. Assigning a consultant and setting a duration happen in a later step that isn't built. `scheduled_at` is the student's preferred time.
 - "Complete" is the student's own tracking. It can be set at any time, even before the scheduled time, and toggling it doesn't re-check the booking window.
 - A past `scheduled` booking can still be cancelled. Status rules don't depend on time.
-- Upcoming and past are split by date against now, whatever the status.
+- The dashboard groups by display state. A past `scheduled` booking shows as "Past, not marked" under Needs your update, and a past `completed` one is in History. Display state comes from the status and the time against now.
 - First and last name are stored on each consultation because the brief puts them on the form. The account email is in `profiles`, so the admin can see who booked even if the typed names differ.
 - Admins are staff accounts. They don't book, and they can't change anything. Each user has one role.
 - Times are stored as `timestamptz` (UTC). The client sends ISO 8601 with an offset, and the UI shows the browser's local time.
@@ -325,6 +336,6 @@ Nothing in the planned scope was cut. Admin pagination is built. Next steps:
 - A consultant role with `consultant_id`, and consultant-side rescheduling.
 - Separate attendance (did it happen) from the student's own "completed" flag and feedback.
 - An exact `application/json` media-type check, and cursor re-validation inside `listAll`.
-- Move keyboard focus to a sensible element after a cancel dialog closes.
+- Move keyboard focus to a sensible element after a successful cancel or reschedule. Focus returns to the opener when a cancel dialog closes without cancelling, but after a successful change the row moves and focus falls to the page.
 - End-to-end browser tests. The UI was checked over HTTP with real sessions (role redirects, API flows, headers), not in a real browser.
 - A hosted deployment.
