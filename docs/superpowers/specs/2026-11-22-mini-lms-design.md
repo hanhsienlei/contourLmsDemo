@@ -58,6 +58,7 @@ The UI barely counts. The design aims to be small, consistent and easy to defend
   - The 24-hour minimum gives the triage step time to assign a consultant.
   - The 14-day maximum fits how far ahead high-school students actually plan.
   - Both are rolling windows from now, not calendar days, so no time zone has to decide when "tomorrow" starts.
+- **Business hours (added after the browser walkthrough):** consultations start between 8:00 am and 7:45 pm `Australia/Melbourne` time. Enforced in the service and reflected in the picker.
 
 ## 5. Approaches considered
 

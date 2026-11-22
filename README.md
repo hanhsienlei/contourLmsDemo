@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 116 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 123 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -111,7 +111,7 @@ Postgres                          RLS on with no policies; integrity constraints
 | Kind of rule | Example | Lives in |
 |---|---|---|
 | Permission: who | owner-only changes, admin-only list | TypeScript: `lib/auth/guards.ts` and the service |
-| Business: when and which transition | 1 to 14 days ahead, cancelled is final | TypeScript: `lib/consultations/service.ts` and `rules.ts` |
+| Business: when and which transition | 1 to 14 days ahead, 8 am to 8 pm Melbourne time, cancelled is final | TypeScript: `lib/consultations/service.ts` and `rules.ts` |
 | Data integrity: what is valid data | status enum, 15-minute alignment, one active booking per slot | Postgres constraints |
 
 ### API
@@ -214,12 +214,14 @@ Every student query includes `user_id = <verified user>`, so another student's b
 - `EXECUTE` is revoked from `public`, `anon` and `authenticated`.
 - The role defaults to `student`. Nothing a user sends at sign-up can choose it.
 
-### The 1 to 14 day booking window
+### Booking window and business hours
 
 - At least 24 hours ahead: a later triage step (out of scope) needs time to assign a consultant.
 - At most 14 days ahead: high-school students rarely plan further out, and it caps how many future bookings one student can hold.
 - Both limits are rolling from now, not calendar days, so no time zone has to decide when "tomorrow" starts.
-- The values are constants in `lib/consultations/rules.ts` (`MIN_LEAD_HOURS = 24`, `MAX_AHEAD_DAYS = 14`, `SLOT_MINUTES = 15`). The service and the `SlotPicker` both use them, so a change is one line.
+- Consultations start between 8:00 am and 7:45 pm **Melbourne time** (`Australia/Melbourne`), on the quarter hour. The brief sets no hours, but a 1:30 am consultation can't be staffed. Contour is Melbourne-based, so the hours are pinned to that zone and daylight saving is handled by `Intl`. The picker shows the same hours converted to the student's local time, with a one-line note saying so.
+- The values are constants in `lib/consultations/rules.ts` (`MIN_LEAD_HOURS`, `MAX_AHEAD_DAYS`, `SLOT_MINUTES`, `BUSINESS_TIME_ZONE`, `OPEN_HOUR`, `CLOSE_HOUR`). The service enforces them, and the `SlotPicker` only offers slots that pass (both use the same `availableSlots` and `isWithinBusinessHours`), so a change is one line.
+- Validation messages are written for students ("First name is required", "Choose a day and time"), set in the shared zod schema that both the form and the API use.
 
 ## 4. Assumptions
 
@@ -285,7 +287,7 @@ Grants are locked by default for objects created by `postgres` (what migrations 
 
 Signed-out API calls get 401 JSON, not a redirect to the login page. Pages still redirect.
 
-Booking spam: there is no per-student limit. The unique slot rule and the 14-day window cap one student at about 1,250 active future bookings (13 days of 96 slots). Rate limiting is the right fix (see "With more time").
+Booking spam: there is no per-student limit. The unique slot rule and the 14-day window cap one student at about 650 active future bookings (13 days of 48 open slots). Rate limiting is the right fix (see "With more time").
 
 Roles take effect immediately. The role is read from the database on every request, so demoting an admin works at once. A role stored in a JWT claim would stay stale until the token refreshes.
 

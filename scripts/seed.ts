@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { assertLocalSupabaseUrl } from './local-guard'
+import { atBusinessTime } from '../lib/consultations/rules'
 
 process.loadEnvFile('.env.local')
 
@@ -14,11 +15,11 @@ const supabase = createClient(url, secret, {
 const PASSWORD = 'Password123!'
 const EMAILS = { admin: 'admin@demo.local', alice: 'alice@demo.local', bob: 'bob@demo.local' }
 
-const MIN = 60_000
-const HOUR = 60 * MIN
-const DAY = 24 * HOUR
-const base = Math.floor(Date.now() / HOUR) * HOUR
-const at = (offsetMs: number) => new Date(base + offsetMs).toISOString()
+// Melbourne wall-clock times relative to today, all inside business hours
+// (8:00 am to 8:00 pm) and on the quarter hour, so seeded bookings look like
+// ones a student could actually have made.
+const today = new Date()
+const at = (days: number, hour: number, minute = 0) => atBusinessTime(today, days, hour, minute).toISOString()
 
 async function deleteExistingDemoUsers() {
   const wanted = new Set(Object.values(EMAILS))
@@ -61,16 +62,16 @@ async function main() {
   const alice = { user_id: aliceId, first_name: 'Alice', last_name: 'Nguyen' }
   const bob = { user_id: bobId, first_name: 'Bob', last_name: 'Smith' }
   const rows = [
-    { ...alice, reason: 'Help with VCE Methods SAC prep', scheduled_at: at(2 * DAY), status: 'scheduled' },
-    { ...alice, reason: 'Essay structure for English Language', scheduled_at: at(5 * DAY + 15 * MIN), status: 'scheduled' },
-    { ...alice, reason: 'Review of Chemistry practice exam', scheduled_at: at(-3 * DAY), status: 'scheduled' },
-    { ...alice, reason: 'Study plan for Term 3 exams', scheduled_at: at(-7 * DAY), status: 'completed' },
-    { ...alice, reason: 'Specialist Maths integration questions', scheduled_at: at(4 * DAY), status: 'completed' },
-    { ...alice, reason: 'Rescheduled: Physics projectile motion', scheduled_at: at(5 * DAY + 15 * MIN), status: 'cancelled' },
-    { ...bob, reason: 'University pathway advice', scheduled_at: at(DAY + 2 * HOUR), status: 'scheduled' },
-    { ...bob, reason: 'Biology SAC feedback', scheduled_at: at(10 * DAY), status: 'scheduled' },
-    { ...bob, reason: 'Clash with sports training', scheduled_at: at(-DAY), status: 'cancelled' },
-    { ...bob, reason: 'Algebra revision session', scheduled_at: at(-2 * DAY), status: 'completed' },
+    { ...alice, reason: 'Help with VCE Methods SAC prep', scheduled_at: at(2, 10), status: 'scheduled' },
+    { ...alice, reason: 'Essay structure for English Language', scheduled_at: at(5, 15, 15), status: 'scheduled' },
+    { ...alice, reason: 'Review of Chemistry practice exam', scheduled_at: at(-3, 16), status: 'scheduled' },
+    { ...alice, reason: 'Study plan for Term 3 exams', scheduled_at: at(-7, 11), status: 'completed' },
+    { ...alice, reason: 'Specialist Maths integration questions', scheduled_at: at(4, 14), status: 'completed' },
+    { ...alice, reason: 'Rescheduled: Physics projectile motion', scheduled_at: at(5, 15, 15), status: 'cancelled' },
+    { ...bob, reason: 'University pathway advice', scheduled_at: at(2, 17, 30), status: 'scheduled' },
+    { ...bob, reason: 'Biology SAC feedback', scheduled_at: at(10, 9, 30), status: 'scheduled' },
+    { ...bob, reason: 'Clash with sports training', scheduled_at: at(-1, 13), status: 'cancelled' },
+    { ...bob, reason: 'Algebra revision session', scheduled_at: at(-2, 10, 30), status: 'completed' },
   ]
   const { error: insErr } = await supabase.from('consultations').insert(rows)
   if (insErr) throw insErr

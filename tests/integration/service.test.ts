@@ -4,7 +4,9 @@ import { book, cancel, listAll, listOwn, reschedule, setCompleted } from '@/lib/
 
 const HOUR = 3_600_000
 const stamp = Date.now()
-const now = new Date(Math.floor(Date.now() / HOUR) * HOUR)
+// Fixed Monday 9:00 am in Melbourne (AEDT). No DST change in the next 14 days,
+// so slot(h) lands on business hours whenever (9 + h) % 24 is between 8 and 19.
+const now = new Date('2030-11-04T09:00:00+11:00')
 const slot = (h: number) => new Date(now.getTime() + h * HOUR)
 const input = (d: Date, reason = 'Help') => ({
   firstName: 'Ada',
@@ -83,7 +85,7 @@ describe('ownership', () => {
 
 describe('status changes', () => {
   it('complete / idempotent / uncomplete', async () => {
-    const c = await book(B, input(slot(90)), now)
+    const c = await book(B, input(slot(96)), now)
     expect((await setCompleted(B, c.id, true)).status).toBe('completed')
     expect((await setCompleted(B, c.id, true)).status).toBe('completed')
     expect((await setCompleted(B, c.id, false)).status).toBe('scheduled')
@@ -98,9 +100,9 @@ describe('status changes', () => {
   })
 
   it('cannot reschedule a completed booking', async () => {
-    const c = await book(B, input(slot(110)), now)
+    const c = await book(B, input(slot(104)), now)
     await setCompleted(B, c.id, true)
-    await expect(reschedule(B, c.id, slot(111).toISOString(), now)).rejects.toMatchObject({ code: 'conflict' })
+    await expect(reschedule(B, c.id, slot(105).toISOString(), now)).rejects.toMatchObject({ code: 'conflict' })
   })
 
   it('cannot reschedule into own completed slot', async () => {
@@ -112,14 +114,25 @@ describe('status changes', () => {
 
   it('reschedules to a new slot', async () => {
     const c = await book(B, input(slot(130)), now)
-    const r = await reschedule(B, c.id, slot(131).toISOString(), now)
-    expect(new Date(r.scheduledAt).getTime()).toBe(slot(131).getTime())
+    const r = await reschedule(B, c.id, slot(129).toISOString(), now)
+    expect(new Date(r.scheduledAt).getTime()).toBe(slot(129).getTime())
   })
 
   it('reschedule enforces window and alignment', async () => {
-    const c = await book(B, input(slot(140)), now)
+    const c = await book(B, input(slot(144)), now)
     await expect(reschedule(B, c.id, slot(1).toISOString(), now)).rejects.toMatchObject({ code: 'validation' })
-    await expect(reschedule(B, c.id, new Date(slot(141).getTime() + 1000).toISOString(), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(reschedule(B, c.id, new Date(slot(145).getTime() + 1000).toISOString(), now)).rejects.toMatchObject({ code: 'validation' })
+  })
+
+  it('book and reschedule enforce Melbourne business hours', async () => {
+    // slot(40) is 1:00 am, slot(35) is 8:00 pm (closing): both outside hours.
+    await expect(book(B, input(slot(40)), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(book(B, input(slot(35)), now)).rejects.toMatchObject({ code: 'validation' })
+    const c = await book(B, input(slot(34)), now) // 7:00 pm is fine
+    await expect(reschedule(B, c.id, slot(40).toISOString(), now)).rejects.toMatchObject({
+      code: 'validation',
+      message: 'Consultations start between 8:00 am and 7:45 pm Melbourne time',
+    })
   })
 })
 

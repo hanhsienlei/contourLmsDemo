@@ -1,19 +1,24 @@
 import { z } from 'zod';
 import { isSlotAligned } from './rules';
 
-const name = z.string().trim().min(1).max(100);
+const requiredText = (label: string, max: number, requiredMessage = `${label} is required`) =>
+  z
+    .string({ error: requiredMessage })
+    .trim()
+    .min(1, { error: requiredMessage })
+    .max(max, { error: `${label} must be ${max} characters or fewer` });
 
 const scheduledAt = z
-  .string()
+  .string({ error: 'Choose a day and time' })
   .trim()
-  .pipe(z.iso.datetime({ offset: true }))
-  .refine((s) => isSlotAligned(new Date(s)), { message: 'Must be aligned to a 15-minute slot' });
+  .pipe(z.iso.datetime({ offset: true, error: 'Choose a day and time' }))
+  .refine((s) => isSlotAligned(new Date(s)), { error: 'Choose a time on the quarter hour' });
 
 export const createConsultationSchema = z
   .object({
-    firstName: name,
-    lastName: name,
-    reason: z.string().trim().min(1).max(1000),
+    firstName: requiredText('First name', 100),
+    lastName: requiredText('Last name', 100),
+    reason: requiredText('Reason', 1000, 'Tell us what the consultation is about'),
     scheduledAt,
   })
   .strict();

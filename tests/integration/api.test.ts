@@ -8,20 +8,20 @@ import { GET as listGet, POST as createPost } from '@/app/api/consultations/rout
 import { PATCH as patchById } from '@/app/api/consultations/[id]/route'
 import { POST as cancelPost } from '@/app/api/consultations/[id]/cancel/route'
 import { GET as adminGet } from '@/app/api/admin/consultations/route'
+import { availableSlots } from '@/lib/consultations/rules'
 
 const BASE = 'http://localhost:3000'
-const SLOT = 15 * 60_000
 const stamp = Date.now()
 let A: string
 let B: string
 let ADMIN: string
 let n = 0
 
-// Distinct 15-min-aligned slot ~2-3 days out per call to avoid collisions.
-const slot = () => {
-  const t = Math.ceil((Date.now() + 2 * 86_400_000) / SLOT) * SLOT + (++n + (stamp % 50)) * SLOT
-  return new Date(t).toISOString()
-}
+// The routes use the real clock, so pick from the real open slots (inside the
+// booking window and business hours). Start a few days in so a slot can't drift
+// below the 24-hour minimum mid-run, and offset by run so reruns don't collide.
+const openSlots = availableSlots(new Date())
+const slot = () => openSlots[96 + ((stamp % 50) + ++n) * 2].toISOString()
 const body = (extra: object = {}) => ({
   firstName: 'Ada',
   lastName: 'Lovelace',

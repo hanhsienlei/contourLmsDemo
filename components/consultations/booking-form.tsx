@@ -90,7 +90,7 @@ export function BookingForm() {
           name="scheduledAt"
           render={({ field }) => <SlotPicker value={field.value} onChange={field.onChange} />}
         />
-        <FieldError id="scheduledAt-error" message={errors.scheduledAt && 'Choose a day and time'} />
+        <FieldError id="scheduledAt-error" message={errors.scheduledAt?.message} />
       </fieldset>
       <Button type="submit" disabled={pending} className="w-fit">
         {pending ? 'Booking…' : 'Book consultation'}

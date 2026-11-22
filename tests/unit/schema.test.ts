@@ -34,6 +34,21 @@ describe('createConsultationSchema', () => {
   it('rejects misaligned scheduledAt', () => {
     expect(() => createConsultationSchema.parse({ ...valid, scheduledAt: '2030-01-02T10:14:00Z' })).toThrow();
   });
+
+  const messageFor = (input: object, field: string) => {
+    const r = createConsultationSchema.safeParse({ ...valid, ...input });
+    expect(r.success).toBe(false);
+    return r.error!.issues.find((i) => i.path[0] === field)?.message;
+  };
+  it('uses plain-English messages', () => {
+    expect(messageFor({ firstName: ' ' }, 'firstName')).toBe('First name is required');
+    expect(messageFor({ lastName: '' }, 'lastName')).toBe('Last name is required');
+    expect(messageFor({ reason: '' }, 'reason')).toBe('Tell us what the consultation is about');
+    expect(messageFor({ firstName: 'a'.repeat(101) }, 'firstName')).toBe('First name must be 100 characters or fewer');
+    expect(messageFor({ reason: 'a'.repeat(1001) }, 'reason')).toBe('Reason must be 1000 characters or fewer');
+    expect(messageFor({ scheduledAt: '' }, 'scheduledAt')).toBe('Choose a day and time');
+    expect(messageFor({ scheduledAt: '2030-01-02T10:14:00Z' }, 'scheduledAt')).toBe('Choose a time on the quarter hour');
+  });
 });
 
 describe('updateConsultationSchema', () => {

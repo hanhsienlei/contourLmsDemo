@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { errors, mapDbError } from '@/lib/api/http'
-import { isSlotAligned, isWithinBookingWindow, type ConsultationStatus } from './rules'
+import { isSlotAligned, isWithinBookingWindow, isWithinBusinessHours, type ConsultationStatus } from './rules'
 import { encodeCursor, type CreateConsultationInput, type Cursor } from './schema'
 
 export type Consultation = {
@@ -42,12 +42,14 @@ function toConsultation(row: Row): Consultation {
 }
 
 const WINDOW_MSG = 'Consultations must be booked between 24 hours and 14 days ahead'
+const HOURS_MSG = 'Consultations start between 8:00 am and 7:45 pm Melbourne time'
 
 function assertBookable(scheduledAt: string, now: Date): string {
   const d = new Date(scheduledAt)
   if (Number.isNaN(d.getTime())) throw errors.validation('Invalid date')
   if (!isSlotAligned(d)) throw errors.validation('Consultations must start on a 15-minute boundary')
   if (!isWithinBookingWindow(d, now)) throw errors.validation(WINDOW_MSG)
+  if (!isWithinBusinessHours(d)) throw errors.validation(HOURS_MSG)
   return d.toISOString()
 }
 
