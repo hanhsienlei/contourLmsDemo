@@ -1,6 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { errors, mapDbError } from '@/lib/api/http'
-import { isSlotAligned, isWithinBookingWindow, isWithinBusinessHours, type ConsultationStatus } from './rules'
+import {
+  HOURS_MESSAGE,
+  WINDOW_MESSAGE,
+  isSlotAligned,
+  isWithinBookingWindow,
+  isWithinBusinessHours,
+  type ConsultationStatus,
+} from './rules'
 import { encodeCursor, type CreateConsultationInput, type Cursor } from './schema'
 
 export type Consultation = {
@@ -41,15 +48,12 @@ function toConsultation(row: Row): Consultation {
   }
 }
 
-const WINDOW_MSG = 'Consultations must be booked between 24 hours and 14 days ahead'
-const HOURS_MSG = 'Consultations start between 8:00 am and 7:45 pm Melbourne time'
-
 function assertBookable(scheduledAt: string, now: Date): string {
   const d = new Date(scheduledAt)
   if (Number.isNaN(d.getTime())) throw errors.validation('Invalid date')
   if (!isSlotAligned(d)) throw errors.validation('Consultations must start on a 15-minute boundary')
-  if (!isWithinBookingWindow(d, now)) throw errors.validation(WINDOW_MSG)
-  if (!isWithinBusinessHours(d)) throw errors.validation(HOURS_MSG)
+  if (!isWithinBookingWindow(d, now)) throw errors.validation(WINDOW_MESSAGE)
+  if (!isWithinBusinessHours(d)) throw errors.validation(HOURS_MESSAGE)
   return d.toISOString()
 }
 
@@ -86,8 +90,9 @@ type Change = {
 }
 
 // One conditional update scoped by id, owner and source status. If nothing changed,
-// read the row once to decide between not found / conflict / idempotent no-op.
-async function transition(userId: string, id: string, change: Change, noopStatus?: ConsultationStatus): Promise<Consultation> {
+// read the row once to decide between not found / conflict / idempotent no-op
+// (the row is already in `alreadyDoneStatus`, e.g. marking a completed booking complete).
+async function transition(userId: string, id: string, change: Change, alreadyDoneStatus?: ConsultationStatus): Promise<Consultation> {
   const db = createAdminClient()
   const { data, error } = await db
     .from('consultations')
@@ -109,7 +114,7 @@ async function transition(userId: string, id: string, change: Change, noopStatus
   if (readError) throw mapDbError(readError)
   if (!row) throw errors.notFound()
   if (row.status === 'cancelled') throw errors.conflict('Cancelled consultations cannot be changed')
-  if (noopStatus && row.status === noopStatus) return toConsultation(row)
+  if (alreadyDoneStatus && row.status === alreadyDoneStatus) return toConsultation(row)
   throw errors.conflict('Only scheduled consultations can be rescheduled or cancelled')
 }
 
@@ -150,9 +155,7 @@ export async function listAll(q: { cursor?: Cursor; limit: number }): Promise<{ 
   const rows = data ?? []
   const page = rows.slice(0, q.limit)
   const items: AdminConsultation[] = page.map((row) => {
-    const p = (row as { profiles?: { email: string } | { email: string }[] | null }).profiles
-    const email = (Array.isArray(p) ? p[0]?.email : p?.email) ?? ''
-    return { ...toConsultation(row), email }
+    return { ...toConsultation(row), email: row.profiles?.email ?? '' }
   })
   const last = page[page.length - 1]
   const nextCursor =

@@ -111,7 +111,7 @@ Postgres   RLS on (no policies) · data-integrity constraints only
 | Kind of rule | Example | Lives in |
 |---|---|---|
 | Permission: who | owner-only changes, admin-only list | TypeScript (guards + service) |
-| Business: when/what transition | booked 1–14 days ahead, cancelled is final | TypeScript (service) |
+| Business: when/what transition | booked 24 hours to 14 days ahead, starts 8:00 am to 7:45 pm Melbourne time, cancelled is final | TypeScript (service) |
 | Data integrity: what data is valid | status enum, 15-minute alignment, unique active slot | Postgres constraints |
 
 The database keeps only rules that must hold whoever writes, including migrations and seed scripts.
@@ -214,7 +214,9 @@ alter default privileges for role postgres in schema public
 - `scheduled_at` must sit on a 15-minute boundary, with zero seconds. The UI only offers 15-minute options, and the API *rejects* anything else; it doesn't silently round.
 - It must be at least 24 hours from now and at most 14 days from now (`now + 24h ≤ scheduled_at ≤ now + 14d`).
   - These are named constants (`MIN_LEAD_HOURS = 24`, `MAX_AHEAD_DAYS = 14`) in `lib/consultations/rules.ts`.
-  - The zod schema, the service and the `SlotPicker` all import them, so changing a value takes one line.
+  - The service and the `SlotPicker` import them. The zod schema checks only the 15-minute alignment, because the window depends on `now`; window and hours errors come from the service.
+  - The user-facing wording (`HOURS_MESSAGE`, `WINDOW_MESSAGE`, `BOOKING_RULES_SUMMARY`) is built from the same constants, so changing a value takes one line and the text follows.
+- **Business hours:** it must start between 8:00 am and 7:45 pm `Australia/Melbourne` wall-clock time (`OPEN_HOUR = 8`, `CLOSE_HOUR = 20`, exclusive). Daylight saving is handled with `Intl`.
 - Times are stored as `timestamptz` (UTC). The client sends ISO 8601 with an offset, and the UI shows times in the browser's local time zone.
 
 **One active booking per slot:** enforced by the unique index. Service maps Postgres error `23505` to 409.
@@ -287,7 +289,7 @@ These rules are needed because the service holds a key that bypasses RLS. One ca
 
 - `/auth/*`: the template's login, sign-up and logout. **Sign-up change:** confirmations are off locally, so the user goes straight to `/` after sign-up. The template's "check your email" success page is removed, or no longer linked.
 - `/dashboard` (student): upcoming and past consultations, split by `scheduled_at` against now. Each row has a complete checkbox, Reschedule (dialog) and Cancel (with confirmation). Cancelled rows are shown muted, with no actions.
-- `/consultations/new` (student): the booking form. It uses the **same `SlotPicker`** (date plus 15-minute time select, offering only slots 24 hours to 14 days from now) as the reschedule dialog.
+- `/consultations/new` (student): the booking form. It uses the **same `SlotPicker`** (date plus 15-minute time select, offering only slots 24 hours to 14 days from now, within business hours, shown in the browser's local time under a one-line note of the rules) as the reschedule dialog.
 - `/admin` (admin): a read-only table of all consultations, including cancelled. Columns: account email, first and last name as entered, reason, time, status. Paginated (see the §9 fallback).
 
 **Component quality:**
@@ -397,7 +399,7 @@ Items that don't fit become "with more time" notes in the README, and the spec r
 6. **Security notes:**
    - the §8a rules
    - locked-by-default grants plus the RLS-on test
-   - **booking spam:** there's no per-student limit, but the unique-slot rule and the 14-day window cap active future bookings at about 1,250 per student; rate limiting is the proper fix (see "with more time")
+   - **booking spam:** there's no per-student limit, but the unique-slot rule and the 14-day window cap active future bookings at about 650 per student (13 days of 48 open slots); rate limiting is the proper fix (see "with more time")
    - **roles take effect immediately:** the role is read on every request, so demoting an admin works at once (a JWT claim would stay stale until the token refreshes)
 7. **In production:**
    - Supabase read-only roles for team members on the production project

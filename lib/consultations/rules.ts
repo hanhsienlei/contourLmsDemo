@@ -32,6 +32,7 @@ export function isWithinBookingWindow(d: Date, now: Date): boolean {
  * anywhere sees the same staffed hours converted to their local time.
  */
 export const BUSINESS_TIME_ZONE = 'Australia/Melbourne';
+export const BUSINESS_ZONE_LABEL = 'Melbourne';
 export const OPEN_HOUR = 8;
 export const CLOSE_HOUR = 20;
 
@@ -77,3 +78,18 @@ export function availableSlots(now: Date): Date[] {
   }
   return slots;
 }
+
+/** Minutes after midnight as a 12-hour clock time, e.g. 480 -> "8:00 am". */
+function clockTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = String(minutes % 60).padStart(2, '0');
+  return `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'am' : 'pm'}`;
+}
+
+const FIRST_START = clockTime(OPEN_HOUR * 60);
+const LAST_START = clockTime(CLOSE_HOUR * 60 - SLOT_MINUTES);
+
+// User-facing wording for the rules above, built from the same constants so it can't drift.
+export const HOURS_MESSAGE = `Consultations start between ${FIRST_START} and ${LAST_START} ${BUSINESS_ZONE_LABEL} time`;
+export const WINDOW_MESSAGE = `Consultations must be booked between ${MIN_LEAD_HOURS} hours and ${MAX_AHEAD_DAYS} days ahead`;
+export const BOOKING_RULES_SUMMARY = `${HOURS_MESSAGE}, ${MIN_LEAD_HOURS} hours to ${MAX_AHEAD_DAYS} days ahead.`;

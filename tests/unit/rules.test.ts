@@ -6,6 +6,9 @@ import {
   isWithinBusinessHours,
   atBusinessTime,
   availableSlots,
+  HOURS_MESSAGE,
+  WINDOW_MESSAGE,
+  BOOKING_RULES_SUMMARY,
 } from '@/lib/consultations/rules';
 
 // 2030-01-01T09:07Z is 20:07 in Melbourne (AEDT, UTC+11).
@@ -97,5 +100,15 @@ describe('availableSlots', () => {
     const s = availableSlots(new Date('2030-10-05T14:00:00Z'));
     expect(s.every(isWithinBusinessHours)).toBe(true);
     expect(s.length % 48).toBe(0);
+  });
+});
+
+describe('rule messages', () => {
+  it('are built from the constants and agree with each other', () => {
+    expect(HOURS_MESSAGE).toBe('Consultations start between 8:00 am and 7:45 pm Melbourne time');
+    expect(WINDOW_MESSAGE).toBe('Consultations must be booked between 24 hours and 14 days ahead');
+    expect(BOOKING_RULES_SUMMARY).toBe(
+      'Consultations start between 8:00 am and 7:45 pm Melbourne time, 24 hours to 14 days ahead.',
+    );
   });
 });

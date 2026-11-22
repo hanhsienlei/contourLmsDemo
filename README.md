@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 123 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 126 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -111,7 +111,7 @@ Postgres                          RLS on with no policies; integrity constraints
 | Kind of rule | Example | Lives in |
 |---|---|---|
 | Permission: who | owner-only changes, admin-only list | TypeScript: `lib/auth/guards.ts` and the service |
-| Business: when and which transition | 1 to 14 days ahead, 8 am to 8 pm Melbourne time, cancelled is final | TypeScript: `lib/consultations/service.ts` and `rules.ts` |
+| Business: when and which transition | 24 hours to 14 days ahead, starts 8:00 am to 7:45 pm Melbourne time, cancelled is final | TypeScript: `lib/consultations/service.ts` and `rules.ts` |
 | Data integrity: what is valid data | status enum, 15-minute alignment, one active booking per slot | Postgres constraints |
 
 ### API
@@ -238,7 +238,10 @@ Every student query includes `user_id = <verified user>`, so another student's b
 
 ## 5. Schema and migrations
 
-There is one migration: [`supabase/migrations/20261122075056_init.sql`](supabase/migrations/20261122075056_init.sql). `npm run db:reset` applies it. Types are generated into `lib/supabase/database.types.ts`.
+There are two migrations, applied in order by `npm run db:reset`:
+
+- [`20261122075056_init.sql`](supabase/migrations/20261122075056_init.sql): enums, tables, constraints, triggers, RLS and grants.
+- [`20261122084321_lock_function_defaults.sql`](supabase/migrations/20261122084321_lock_function_defaults.sql): revokes the global `PUBLIC` EXECUTE default on functions (see §6). Types are generated into `lib/supabase/database.types.ts`.
 
 | Table | Columns | Notes |
 |---|---|---|

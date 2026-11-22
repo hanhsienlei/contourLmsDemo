@@ -30,8 +30,6 @@ export const updateConsultationSchema = z.union([
 ]);
 export type UpdateConsultationInput = z.infer<typeof updateConsultationSchema>;
 
-export const idSchema = z.string().uuid();
-
 export const adminListQuerySchema = z
   .object({
     cursor: z.string().optional(),
@@ -54,4 +52,13 @@ export function decodeCursor(s: string): Cursor | null {
   } catch {
     return null;
   }
+}
+
+/** Validates the admin list query and decodes its cursor. Null means the page link is invalid. */
+export function parseAdminListQuery(raw: unknown): { cursor?: Cursor; limit: number } | null {
+  const parsed = adminListQuerySchema.safeParse(raw);
+  if (!parsed.success) return null;
+  if (parsed.data.cursor === undefined) return { cursor: undefined, limit: parsed.data.limit };
+  const cursor = decodeCursor(parsed.data.cursor);
+  return cursor ? { cursor, limit: parsed.data.limit } : null;
 }

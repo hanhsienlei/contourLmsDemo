@@ -29,6 +29,13 @@ export const errors = {
   conflict: (msg: string) => new ApiError(409, 'conflict', msg),
 };
 
+/** Route `[id]` params are UUIDs; anything else is a 400 before it can reach Postgres. */
+export function parseRouteId(raw: string): string {
+  const parsed = z.uuid().safeParse(raw);
+  if (!parsed.success) throw errors.validation('Invalid id');
+  return parsed.data;
+}
+
 export function mapDbError(e: { code?: string; message: string }): ApiError {
   if (e.code === '23505') return errors.conflict('That time slot is already booked');
   if (e.code === '22P02') return errors.validation('Invalid id');

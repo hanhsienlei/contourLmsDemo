@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { ApiError, errors, mapDbError, assertSameOrigin, parseJson, handle } from '@/lib/api/http';
+import { ApiError, errors, mapDbError, assertSameOrigin, parseJson, parseRouteId, handle } from '@/lib/api/http';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -103,5 +103,13 @@ describe('handle', () => {
   it('passes through success', async () => {
     const res = await handle(async (x: number) => Response.json({ x }))(5);
     expect(await res.json()).toEqual({ x: 5 });
+  });
+});
+
+describe('parseRouteId', () => {
+  it('returns a valid uuid and rejects anything else with a 400', () => {
+    const id = '123e4567-e89b-42d3-a456-426614174000';
+    expect(parseRouteId(id)).toBe(id);
+    expect(() => parseRouteId('1')).toThrow(expect.objectContaining({ status: 400, message: 'Invalid id' }));
   });
 });

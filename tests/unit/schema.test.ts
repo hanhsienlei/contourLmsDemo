@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   createConsultationSchema,
   updateConsultationSchema,
-  idSchema,
   adminListQuerySchema,
   encodeCursor,
   decodeCursor,
+  parseAdminListQuery,
 } from '@/lib/consultations/schema';
 
 const valid = {
@@ -64,12 +64,6 @@ describe('updateConsultationSchema', () => {
   });
 });
 
-describe('idSchema', () => {
-  it('rejects non-uuid', () => {
-    expect(idSchema.safeParse('1').success).toBe(false);
-  });
-});
-
 describe('adminListQuerySchema', () => {
   it('defaults limit to 20', () => {
     expect(adminListQuerySchema.parse({}).limit).toBe(20);
@@ -91,5 +85,17 @@ describe('cursor', () => {
   it('returns null on garbage and injection', () => {
     expect(decodeCursor('garbage')).toBeNull();
     expect(decodeCursor(encodeCursor({ ...c, id: 'x),or(1.eq.1' }))).toBeNull();
+  });
+});
+
+describe('parseAdminListQuery', () => {
+  const c = { scheduledAt: '2030-01-02T10:15:00Z', id: '123e4567-e89b-42d3-a456-426614174000' };
+  it('returns the limit and decoded cursor', () => {
+    expect(parseAdminListQuery({})).toEqual({ cursor: undefined, limit: 20 });
+    expect(parseAdminListQuery({ cursor: encodeCursor(c), limit: '5' })).toEqual({ cursor: c, limit: 5 });
+  });
+  it('returns null for a bad limit or an undecodable cursor', () => {
+    expect(parseAdminListQuery({ limit: '101' })).toBeNull();
+    expect(parseAdminListQuery({ cursor: 'garbage' })).toBeNull();
   });
 });

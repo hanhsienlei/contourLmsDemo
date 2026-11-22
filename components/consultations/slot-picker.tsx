@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { availableSlots } from '@/lib/consultations/rules'
+import { BOOKING_RULES_SUMMARY, availableSlots } from '@/lib/consultations/rules'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useMounted } from './use-mounted'
@@ -42,7 +42,7 @@ export function SlotPicker({ value, onChange, now }: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <p id={`${id}-hint`} className="text-sm text-muted-foreground sm:col-span-2">
-        Consultations run 8:00 am to 8:00 pm Melbourne time, booked 1 to 14 days ahead. Times are shown in your local time.
+        {BOOKING_RULES_SUMMARY} Times are shown in your local time.
       </p>
       <div className="grid gap-2">
         <Label htmlFor={`${id}-day`}>Day</Label>

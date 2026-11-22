@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { AdminConsultationTable } from '@/components/consultations/admin-consultation-table'
 import { requireRolePage } from '@/lib/auth/guards'
-import { adminListQuerySchema, decodeCursor, type Cursor } from '@/lib/consultations/schema'
+import { parseAdminListQuery } from '@/lib/consultations/schema'
 import { listAll } from '@/lib/consultations/service'
 
 const PAGE_SIZE = 20
@@ -23,12 +23,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   await requireRolePage('admin')
 
   const sp = await searchParams
-  const parsed = adminListQuerySchema.safeParse({ cursor: sp.cursor, limit: PAGE_SIZE })
-  let cursor: Cursor | undefined
-  if (parsed.success && parsed.data.cursor !== undefined) {
-    cursor = decodeCursor(parsed.data.cursor) ?? undefined
-  }
-  if (!parsed.success || (parsed.data.cursor !== undefined && !cursor)) {
+  const q = parseAdminListQuery({ cursor: sp.cursor, limit: PAGE_SIZE })
+  if (!q) {
     return (
       <div className="grid gap-6">
         <h1 className="text-2xl font-semibold">All consultations</h1>
@@ -37,14 +33,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     )
   }
 
-  const { items, nextCursor } = await listAll({ cursor, limit: PAGE_SIZE })
+  const { items, nextCursor } = await listAll(q)
 
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">All consultations</h1>
       <AdminConsultationTable items={items} />
       <nav aria-label="Pagination" className="flex gap-4">
-        {cursor && (
+        {q.cursor && (
           <Link href="/admin" className="underline underline-offset-4">
             First page
           </Link>
