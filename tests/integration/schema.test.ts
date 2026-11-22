@@ -57,4 +57,22 @@ describe('schema', () => {
   it('trims are enforced: whitespace-only reason is rejected', async () => {
     await expectCode(insert(uid, '2030-03-01T10:00:00Z', 'scheduled', '   '), '23514')
   })
+
+  it('new objects in public are not reachable by anon or authenticated', async () => {
+    const client = await pgPool.connect()
+    try {
+      await client.query('begin')
+      await client.query('create function public.zz_probe_fn() returns int language sql as $$ select 1 $$')
+      await client.query('create table public.zz_probe_tbl (id int)')
+      const { rows } = await client.query(`
+        select has_function_privilege('anon', 'public.zz_probe_fn()', 'execute') as anon_fn,
+               has_function_privilege('authenticated', 'public.zz_probe_fn()', 'execute') as auth_fn,
+               has_table_privilege('anon', 'public.zz_probe_tbl', 'select') as anon_tbl,
+               has_table_privilege('authenticated', 'public.zz_probe_tbl', 'select') as auth_tbl`)
+      expect(rows[0]).toEqual({ anon_fn: false, auth_fn: false, anon_tbl: false, auth_tbl: false })
+    } finally {
+      await client.query('rollback')
+      client.release()
+    }
+  })
 })
