@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 93 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 102 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -162,7 +162,7 @@ Every permission and business rule is in one language and one layer. It's easy t
 
 The risk is that the secret key bypasses RLS, so a bug in the service could leak data. To contain that:
 
-- Only `lib/supabase/admin.ts` creates the privileged client, and it imports `server-only`, so a client bundle that pulls it in fails to build.
+- Only app code in `lib/supabase/admin.ts` creates the privileged client, and it imports `server-only`, so a client bundle that pulls it in fails to build. The seed script and the test helpers build their own clients, outside the app.
 - Every service method takes the verified `userId` and scopes every query by it.
 - Tests check that student B gets 404 on student A's booking and that a student gets 403 from the admin route.
 
@@ -172,7 +172,7 @@ With RLS enabled and no policies, the publishable key and user JWTs can't read o
 
 ### Performance
 
-There's no meaningful difference from RLS. The ownership filter is the same indexed `WHERE user_id = ...` either way, and there's no per-row policy function call. The cost is one primary-key lookup on `user_roles` per request. Indexes:
+There's no meaningful difference from RLS. The ownership filter is the same indexed `WHERE user_id = ...` either way, and there's no per-row policy function call. The cost is one primary-key lookup on `user_roles` and one JWT verification per request. `getRole` and `getVerifiedUserId` are wrapped in React `cache()`, so a page render does each lookup once however many components ask. Route handlers make each lookup once through their guard. Indexes:
 
 - `(user_id, scheduled_at)` for the student list
 - `(scheduled_at, id)` for the admin keyset pagination
@@ -186,7 +186,7 @@ Server components call the service functions directly after the same guard, inst
 
 ### Role routing in pages, not in the proxy
 
-`proxy.ts` only refreshes the session and redirects signed-out users. It never touches the database, so role decisions all go through `getRole` and the guards.
+`proxy.ts` only refreshes the session and redirects signed-out users away from pages. `/api/*` is not redirected: the route handlers return their own 401 JSON, and `apiFetch` also rejects any redirected or non-JSON success response. It never touches the database, so role decisions all go through `getRole` and the guards.
 
 Every page calls `requireRolePage(role)` itself. The route-group layouts (`app/(student)/layout.tsx`, `app/(admin)/layout.tsx`) also call it through `RoleShell`, but that is only a UX redirect, not the security boundary. The reason is `cacheComponents`:
 
@@ -267,7 +267,7 @@ The service holds a key that bypasses RLS, so the code follows these rules:
 1. No user input in PostgREST filter strings: queries use the parameterised builders (`.eq()`, `.order()`, `.limit()`). `.or()` appears once, in the admin keyset cursor in `listAll`. The cursor is base64url JSON, decoded and validated with zod as an ISO datetime and a UUID. The service then re-serialises the timestamp with `Date#toISOString()` before putting both values into the filter, so no raw request text reaches the string.
 2. No mass assignment: request schemas are `.strict()`, so unknown keys get 400. The service writes each column by name, and `user_id` always comes from the verified session. A body containing `userId` is rejected.
 3. Route ids are validated as UUIDs before any query runs (400 otherwise).
-4. No raw database errors reach the client: `23505` becomes 409. Anything unknown is logged on the server and returned as a generic 500 `{ code: 'internal', message: 'Something went wrong' }`.
+4. No raw database errors reach the client: `23505` becomes 409. Anything unknown is logged on the server and returned as a generic 500 `{ code: 'internal', message: 'Something went wrong' }`. `handle()` forces that message for every `ApiError` with status 500 or above.
 5. The session is verified: the server reads the user with `getClaims()`, which verifies the JWT, never with `getSession()`. A user id sent by the client is never trusted.
 6. Missing role fails closed: a user with no `user_roles` row gets 403 from every API route and is redirected to `/no-access`.
 7. Page size is capped: `limit` defaults to 20 and must be 1 to 100.
@@ -280,7 +280,9 @@ The service holds a key that bypasses RLS, so the code follows these rules:
 10. The seed script only runs locally: it deletes users with the secret key, so `scripts/local-guard.ts` aborts unless the URL host is `localhost` or `127.0.0.1`. A unit test covers this.
 11. Secrets stay out of git: `.env*.local` is ignored, and `.env.example` holds placeholders only.
 
-Grants are locked by default. Besides revoking privileges on the three tables, the migration runs `alter default privileges ... revoke all` for tables, sequences and functions created later in `public`. A table added through Studio or `psql` gets no `anon` or `authenticated` access unless a migration grants it on purpose. `tests/integration/schema.test.ts` connects to Postgres directly and checks that every table in `public` has RLS enabled.
+Grants are locked by default for objects created by `postgres` (what migrations run as). Besides revoking privileges on the three tables, the init migration runs `alter default privileges ... in schema public revoke all` for tables and sequences. A second migration (`lock_function_defaults`) also revokes the global `PUBLIC` EXECUTE default on functions, because a revoke scoped to one schema doesn't remove it. `tests/integration/schema.test.ts` checks that every table in `public` has RLS enabled, and creates a throwaway function and table in a rolled-back transaction to prove `anon` and `authenticated` get no access to them. Defaults that the platform's own `supabase_admin` role sets in `public` are outside the migrations' control, so objects created by that role (for example by Supabase extensions) may still be granted to the API roles. Review those separately.
+
+Signed-out API calls get 401 JSON, not a redirect to the login page. Pages still redirect.
 
 Booking spam: there is no per-student limit. The unique slot rule and the 14-day window cap one student at about 1,250 active future bookings (13 days of 96 slots). Rate limiting is the right fix (see "With more time").
 
@@ -289,7 +291,6 @@ Roles take effect immediately. The role is read from the database on every reque
 Known minor gaps:
 
 - The Content-Type check is a prefix match (`application/json...`), not an exact media-type parse.
-- A 5xx `ApiError` passes its own message to the client. All current 5xx errors use the generic message, but `handle()` doesn't force it.
 - `listAll` trusts its typed cursor argument. Both callers validate it first, but the service doesn't re-validate (defence in depth).
 - There is no rate limiting on the API routes.
 - `profiles.email` isn't updated if a user changes their email.
@@ -301,6 +302,9 @@ Known minor gaps:
 - Run a scheduled drift check (`supabase db diff --linked`) that fails if the live schema differs from the migrations.
 - Turn email confirmation on, and keep Supabase Auth's built-in rate limits on login and sign-up.
 - Keep `SUPABASE_SECRET_KEY` in the host's secret store, server-side only.
+- Add `Strict-Transport-Security` (HSTS) and `Permissions-Policy` headers. They're left out locally because HSTS only makes sense over HTTPS.
+- Behind a reverse proxy, configure the allowed origin for the Origin check. It compares against the request URL's own origin, which the proxy may rewrite.
+- With email confirmation on, sign-up returns no session. The sign-up form currently assumes one, so it needs a "check your email" step.
 
 ## 8. With more time
 
@@ -314,7 +318,7 @@ Nothing in the planned scope was cut. Admin pagination is built. Next steps:
 - An exclusion constraint against overlapping bookings once durations exist.
 - A consultant role with `consultant_id`, and consultant-side rescheduling.
 - Separate attendance (did it happen) from the student's own "completed" flag and feedback.
-- An exact `application/json` media-type check, a forced generic message for every 5xx, and cursor re-validation inside `listAll`.
+- An exact `application/json` media-type check, and cursor re-validation inside `listAll`.
 - Move keyboard focus to a sensible element after a cancel dialog closes.
 - End-to-end browser tests. The UI was checked over HTTP with real sessions (role redirects, API flows, headers), not in a real browser.
 - A hosted deployment.
