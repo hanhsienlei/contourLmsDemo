@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth/guards'
 import { createConsultationSchema } from '@/lib/consultations/schema'
 import { book, listOwn } from '@/lib/consultations/service'
 
-export const GET = handle(async (_req: Request) => {
+export const GET = handle(async () => {
   const { userId } = await requireRole('student')
   return NextResponse.json({ items: await listOwn(userId) })
 })

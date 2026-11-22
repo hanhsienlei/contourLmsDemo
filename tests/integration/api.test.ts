@@ -66,7 +66,7 @@ describe('booking', () => {
   })
   it('GET lists own', async () => {
     session.current = A
-    const res = await listGet(req('GET', '/api/consultations'))
+    const res = await listGet()
     expect(res.status).toBe(200)
     expect(Array.isArray((await res.json()).items)).toBe(true)
   })

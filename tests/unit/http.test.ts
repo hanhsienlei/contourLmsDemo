@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { ApiError, errors, mapDbError, assertSameOrigin, parseJson, handle } from '@/lib/api/http';
+import { errors, mapDbError, assertSameOrigin, parseJson, handle } from '@/lib/api/http';
 
 afterEach(() => vi.restoreAllMocks());
 
