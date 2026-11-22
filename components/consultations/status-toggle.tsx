@@ -5,11 +5,13 @@ import { apiFetch } from '@/lib/api/client'
 import type { Consultation } from '@/lib/consultations/service'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { useSlotLabel } from './local-time'
 import { useApiAction } from './use-api-action'
 
 export function StatusToggle({ item }: { item: Consultation }) {
   const id = useId()
   const { pending, run } = useApiAction()
+  const label = useSlotLabel(item.scheduledAt)
   const completed = item.status === 'completed'
 
   return (
@@ -18,6 +20,7 @@ export function StatusToggle({ item }: { item: Consultation }) {
         id={id}
         checked={completed}
         disabled={pending}
+        aria-label={label ? `Mark consultation on ${label} as completed` : 'Completed'}
         onCheckedChange={(next) =>
           run(
             () => apiFetch(`/api/consultations/${item.id}`, { method: 'PATCH', body: { completed: next === true } }),

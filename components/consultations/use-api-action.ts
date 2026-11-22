@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 
 /**
  * Runs one API request at a time: toast on success/failure, refresh server data on success.
- * Resolves true on success so callers can close dialogs or navigate.
+ * Callers react to success (close a dialog, navigate) through `onSuccess`.
  */
 export function useApiAction() {
   const router = useRouter()
@@ -17,8 +17,8 @@ export function useApiAction() {
     request: () => Promise<unknown>,
     successMessage: string,
     onSuccess?: () => void,
-  ): Promise<boolean> {
-    if (inFlight.current) return false
+  ): Promise<void> {
+    if (inFlight.current) return
     inFlight.current = true
     setPending(true)
     try {
@@ -26,10 +26,8 @@ export function useApiAction() {
       toast.success(successMessage)
       onSuccess?.()
       router.refresh()
-      return true
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
-      return false
     } finally {
       inFlight.current = false
       setPending(false)

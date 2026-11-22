@@ -13,13 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { LocalTime } from './local-time'
+import { LocalTime, useSlotLabel } from './local-time'
 import { SlotPicker } from './slot-picker'
 import { useApiAction } from './use-api-action'
 
 export function RescheduleDialog({ item }: { item: Consultation }) {
   const [open, setOpen] = useState(false)
   const [slot, setSlot] = useState('')
+  const label = useSlotLabel(item.scheduledAt)
   const { pending, run } = useApiAction()
 
   const submit = () =>
@@ -38,7 +39,7 @@ export function RescheduleDialog({ item }: { item: Consultation }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" aria-label={label ? `Reschedule consultation on ${label}` : undefined}>
           Reschedule
         </Button>
       </DialogTrigger>

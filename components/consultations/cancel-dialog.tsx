@@ -14,11 +14,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { LocalTime } from './local-time'
+import { LocalTime, useSlotLabel } from './local-time'
 import { useApiAction } from './use-api-action'
 
 export function CancelDialog({ item }: { item: Consultation }) {
   const [open, setOpen] = useState(false)
+  const label = useSlotLabel(item.scheduledAt)
   const { pending, run } = useApiAction()
 
   const confirm = () =>
@@ -31,7 +32,7 @@ export function CancelDialog({ item }: { item: Consultation }) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" aria-label={label ? `Cancel consultation on ${label}` : undefined}>
           Cancel
         </Button>
       </AlertDialogTrigger>

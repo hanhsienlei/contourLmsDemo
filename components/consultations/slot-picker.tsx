@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { availableSlots } from '@/lib/consultations/rules'
 import { Label } from '@/components/ui/label'
@@ -27,6 +27,7 @@ function groupByLocalDay(slots: Date[]): Map<string, Date[]> {
 /** Day + time selects over the bookable window. `now` is read on the client after mount to avoid hydration drift. */
 export function SlotPicker({ value, onChange, now }: Props) {
   const mounted = useMounted()
+  const id = useId()
   const days = useMemo(
     () => (mounted ? groupByLocalDay(availableSlots(now ?? new Date())) : null),
     [mounted, now],
@@ -41,15 +42,15 @@ export function SlotPicker({ value, onChange, now }: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="grid gap-2">
-        <Label htmlFor="slot-day">Day</Label>
+        <Label htmlFor={`${id}-day`}>Day</Label>
         <Select
-          value={day}
+          value={day ?? ''}
           onValueChange={(d) => {
             setPickedDay(d)
             onChange('')
           }}
         >
-          <SelectTrigger id="slot-day" className="w-full">
+          <SelectTrigger id={`${id}-day`} className="w-full">
             <SelectValue placeholder="Choose a day" />
           </SelectTrigger>
           <SelectContent>
@@ -62,9 +63,9 @@ export function SlotPicker({ value, onChange, now }: Props) {
         </Select>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="slot-time">Time</Label>
-        <Select value={value || undefined} onValueChange={onChange} disabled={!day}>
-          <SelectTrigger id="slot-time" className="w-full">
+        <Label htmlFor={`${id}-time`}>Time</Label>
+        <Select value={value ?? ''} onValueChange={onChange} disabled={!day}>
+          <SelectTrigger id={`${id}-time`} className="w-full">
             <SelectValue placeholder="Choose a time" />
           </SelectTrigger>
           <SelectContent>
