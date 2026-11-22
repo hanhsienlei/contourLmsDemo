@@ -1,0 +1,24 @@
+import { createAdminClient } from '@/lib/supabase/admin'
+import { ApiError } from '@/lib/api/http'
+
+export type AppRole = 'student' | 'admin'
+
+export async function getRole(userId: string): Promise<AppRole | null> {
+  const { data, error } = await createAdminClient()
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error(error)
+    throw new ApiError(500, 'internal', 'Something went wrong')
+  }
+  if (!data) return null
+  return data.role === 'student' || data.role === 'admin' ? data.role : null
+}
+
+export function homeFor(role: AppRole | null): '/admin' | '/dashboard' | '/no-access' {
+  if (role === 'admin') return '/admin'
+  if (role === 'student') return '/dashboard'
+  return '/no-access'
+}
