@@ -1,0 +1,157 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { createAuthUser, deleteAuthUser, pgPool } from './helpers/db'
+
+const session = vi.hoisted(() => ({ current: null as string | null }))
+vi.mock('@/lib/auth/session', () => ({ getVerifiedUserId: async () => session.current }))
+
+import { GET as listGet, POST as createPost } from '@/app/api/consultations/route'
+import { PATCH as patchById } from '@/app/api/consultations/[id]/route'
+import { POST as cancelPost } from '@/app/api/consultations/[id]/cancel/route'
+import { GET as adminGet } from '@/app/api/admin/consultations/route'
+
+const BASE = 'http://localhost:3000'
+const SLOT = 15 * 60_000
+const stamp = Date.now()
+let A: string
+let B: string
+let ADMIN: string
+let n = 0
+
+// Distinct 15-min-aligned slot ~2-3 days out per call to avoid collisions.
+const slot = () => {
+  const t = Math.ceil((Date.now() + 2 * 86_400_000) / SLOT) * SLOT + (++n + (stamp % 50)) * SLOT
+  return new Date(t).toISOString()
+}
+const body = (extra: object = {}) => ({
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  reason: 'Help',
+  scheduledAt: slot(),
+  ...extra,
+})
+const req = (method: string, path: string, b?: unknown, headers: Record<string, string> = {}) =>
+  new Request(BASE + path, {
+    method,
+    headers: { origin: BASE, 'content-type': 'application/json', ...headers },
+    body: b === undefined ? undefined : JSON.stringify(b),
+  })
+const ctx = (id: string) => ({ params: Promise.resolve({ id }) })
+const errShape = { error: { code: expect.any(String), message: expect.any(String) } }
+
+beforeAll(async () => {
+  A = await createAuthUser(`api-a-${stamp}@example.com`)
+  B = await createAuthUser(`api-b-${stamp}@example.com`)
+  ADMIN = await createAuthUser(`api-admin-${stamp}@example.com`)
+  await pgPool.query(`update public.user_roles set role = 'admin' where user_id = $1`, [ADMIN])
+})
+
+afterAll(async () => {
+  for (const id of [A, B, ADMIN]) await deleteAuthUser(id)
+  await pgPool.end()
+})
+
+async function bookAs(user: string) {
+  session.current = user
+  const res = await createPost(req('POST', '/api/consultations', body()))
+  expect(res.status).toBe(201)
+  return (await res.json()).item as { id: string }
+}
+
+describe('booking', () => {
+  it('valid POST -> 201 {item}', async () => {
+    session.current = A
+    const res = await createPost(req('POST', '/api/consultations', body()))
+    expect(res.status).toBe(201)
+    expect((await res.json()).item.status).toBe('scheduled')
+  })
+  it('GET lists own', async () => {
+    session.current = A
+    const res = await listGet(req('GET', '/api/consultations'))
+    expect(res.status).toBe(200)
+    expect(Array.isArray((await res.json()).items)).toBe(true)
+  })
+  it('different Origin -> 403', async () => {
+    session.current = A
+    const res = await createPost(req('POST', '/api/consultations', body(), { origin: 'http://evil.example' }))
+    expect(res.status).toBe(403)
+    const j = await res.json()
+    expect(j).toMatchObject(errShape)
+    expect(j.error.code).toBe('forbidden')
+  })
+  it('userId in body -> 400', async () => {
+    session.current = A
+    const res = await createPost(req('POST', '/api/consultations', body({ userId: B })))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+  it('not signed in -> 401', async () => {
+    session.current = null
+    const res = await createPost(req('POST', '/api/consultations', body()))
+    expect(res.status).toBe(401)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+})
+
+describe('changes by id', () => {
+  it('bad uuid -> 400', async () => {
+    session.current = A
+    const res = await patchById(req('PATCH', '/api/consultations/not-a-uuid', { completed: true }), ctx('not-a-uuid'))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+  it("B patching A's booking -> 404", async () => {
+    const item = await bookAs(A)
+    session.current = B
+    const res = await patchById(req('PATCH', `/api/consultations/${item.id}`, { completed: true }), ctx(item.id))
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+  it('A completes -> 200 completed', async () => {
+    const item = await bookAs(A)
+    const res = await patchById(req('PATCH', `/api/consultations/${item.id}`, { completed: true }), ctx(item.id))
+    expect(res.status).toBe(200)
+    expect((await res.json()).item.status).toBe('completed')
+  })
+  it('A reschedules -> 200', async () => {
+    const item = await bookAs(A)
+    const to = slot()
+    const res = await patchById(req('PATCH', `/api/consultations/${item.id}`, { scheduledAt: to }), ctx(item.id))
+    expect(res.status).toBe(200)
+    expect(new Date((await res.json()).item.scheduledAt).toISOString()).toBe(to)
+  })
+  it('cancel twice -> 200 then 409', async () => {
+    const item = await bookAs(A)
+    const r1 = await cancelPost(req('POST', `/api/consultations/${item.id}/cancel`, {}), ctx(item.id))
+    expect(r1.status).toBe(200)
+    const r2 = await cancelPost(req('POST', `/api/consultations/${item.id}/cancel`, {}), ctx(item.id))
+    expect(r2.status).toBe(409)
+    expect(await r2.json()).toMatchObject(errShape)
+  })
+})
+
+describe('admin list', () => {
+  it('student -> 403', async () => {
+    session.current = A
+    const res = await adminGet(req('GET', '/api/admin/consultations'))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+  it('admin -> 200 items array', async () => {
+    session.current = ADMIN
+    const res = await adminGet(req('GET', '/api/admin/consultations'))
+    expect(res.status).toBe(200)
+    expect(Array.isArray((await res.json()).items)).toBe(true)
+  })
+  it('limit=101 -> 400', async () => {
+    session.current = ADMIN
+    const res = await adminGet(req('GET', '/api/admin/consultations?limit=101'))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+  it('cursor=garbage -> 400', async () => {
+    session.current = ADMIN
+    const res = await adminGet(req('GET', '/api/admin/consultations?cursor=garbage'))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject(errShape)
+  })
+})
