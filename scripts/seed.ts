@@ -67,7 +67,7 @@ async function main() {
     { ...alice, reason: 'Review of Chemistry practice exam', scheduled_at: at(-3, 16), status: 'scheduled' },
     { ...alice, reason: 'Study plan for Term 3 exams', scheduled_at: at(-7, 11), status: 'completed' },
     { ...alice, reason: 'Specialist Maths integration questions', scheduled_at: at(4, 14), status: 'completed' },
-    { ...alice, reason: 'Rescheduled: Physics projectile motion', scheduled_at: at(5, 15, 15), status: 'cancelled' },
+    { ...alice, reason: 'Physics projectile motion', scheduled_at: at(5, 15, 15), status: 'cancelled' },
     { ...bob, reason: 'University pathway advice', scheduled_at: at(2, 17, 30), status: 'scheduled' },
     { ...bob, reason: 'Biology SAC feedback', scheduled_at: at(10, 9, 30), status: 'scheduled' },
     { ...bob, reason: 'Clash with sports training', scheduled_at: at(-1, 13), status: 'cancelled' },
