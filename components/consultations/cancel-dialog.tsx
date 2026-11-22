@@ -22,11 +22,14 @@ export function CancelDialog({
   open: openProp,
   onOpenChange,
   trigger = true,
+  onCloseAutoFocus,
 }: {
   item: Consultation
   open?: boolean
   onOpenChange?: (open: boolean) => void
   trigger?: boolean
+  /** Where focus goes when the dialog closes; call `preventDefault()` to take over. */
+  onCloseAutoFocus?: (event: Event) => void
 }) {
   const [openState, setOpenState] = useState(false)
   const open = openProp ?? openState
@@ -36,6 +39,10 @@ export function CancelDialog({
   }
   const label = useSlotLabel(item.scheduledAt)
   const { pending, run } = useApiAction()
+  // While a request is in flight the dialog can't be dismissed, so the double-submit guard can't be bypassed.
+  const blockWhilePending = (event: Event) => {
+    if (pending) event.preventDefault()
+  }
 
   const confirm = () =>
     run(
@@ -45,7 +52,7 @@ export function CancelDialog({
     )
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={open} onOpenChange={(next) => (next || !pending) && setOpen(next)}>
       {trigger && (
         <AlertDialogTrigger asChild>
           <Button variant="outline" size="sm" aria-label={label ? `Cancel consultation on ${label}` : undefined}>
@@ -53,7 +60,7 @@ export function CancelDialog({
           </Button>
         </AlertDialogTrigger>
       )}
-      <AlertDialogContent>
+      <AlertDialogContent onEscapeKeyDown={blockWhilePending} onCloseAutoFocus={onCloseAutoFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>Cancel this consultation?</AlertDialogTitle>
           <AlertDialogDescription>

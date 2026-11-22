@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { rowLayout, type DisplayState } from '@/lib/consultations/display'
+import { rowLayout, type DialogAction, type DisplayState } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
@@ -30,11 +30,30 @@ export function ConsultationRow({
   occupied: number[]
 }) {
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null)
+  // A menu item's dialog opens as the menu closes: skip the menu's focus restore so it can't fight the dialog.
+  const menuTrigger = useRef<HTMLButtonElement>(null)
+  const dialogOpening = useRef(false)
+  // The control that opened the dialog, so focus can come back to it (not <body>) when the dialog closes.
+  const opener = useRef<HTMLElement | null>(null)
   const occupiedSet = useMemo(() => new Set(occupied), [occupied])
   const slot = useSlotLabel(item.scheduledAt)
   const { primary, secondary, menuOnly, menuVisibility } = rowLayout(state)
   const menuClass = menuVisibility === 'below-sm' ? 'sm:hidden' : undefined
   const cancelled = state === 'cancelled'
+
+  const openFromButton = (action: DialogAction, button: HTMLElement) => {
+    opener.current = button
+    setOpenDialog(action)
+  }
+  const openFromMenu = (action: DialogAction) => {
+    dialogOpening.current = true
+    opener.current = menuTrigger.current
+    setOpenDialog(action)
+  }
+  const returnFocus = (event: Event) => {
+    event.preventDefault()
+    if (opener.current?.isConnected) opener.current.focus()
+  }
 
   return (
     <li
@@ -61,19 +80,28 @@ export function ConsultationRow({
             size="sm"
             className="hidden sm:inline-flex"
             aria-label={slot ? `${LABEL[action]} consultation on ${slot}` : undefined}
-            onClick={() => setOpenDialog(action)}
+            onClick={(e) => openFromButton(action, e.currentTarget)}
           >
             {LABEL[action]}
           </Button>
         ))}
         {menuVisibility !== 'never' && (
-          <RowActionsMenu slotLabel={slot} className={menuClass}>
+          <RowActionsMenu
+            slotLabel={slot}
+            className={menuClass}
+            triggerRef={menuTrigger}
+            onCloseAutoFocus={(e) => {
+              if (!dialogOpening.current) return
+              dialogOpening.current = false
+              e.preventDefault()
+            }}
+          >
             {secondary.map((action) => (
               <DropdownMenuItem
                 key={action}
                 className="sm:hidden"
                 aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
-                onSelect={() => setOpenDialog(action)}
+                onSelect={() => openFromMenu(action)}
               >
                 {LABEL[action]}
               </DropdownMenuItem>
@@ -82,7 +110,7 @@ export function ConsultationRow({
               <DropdownMenuItem
                 key={action}
                 aria-label={slot ? `${LABEL[action]}, consultation on ${slot}` : undefined}
-                onSelect={() => setOpenDialog(action)}
+                onSelect={() => openFromMenu(action)}
               >
                 {LABEL[action]}
               </DropdownMenuItem>
@@ -97,12 +125,14 @@ export function ConsultationRow({
             item={item}
             occupied={occupiedSet}
             open={openDialog === 'reschedule'}
+            onCloseAutoFocus={returnFocus}
             onOpenChange={(o) => setOpenDialog(o ? 'reschedule' : null)}
           />
           <CancelDialog
             item={item}
             trigger={false}
             open={openDialog === 'cancel'}
+            onCloseAutoFocus={returnFocus}
             onOpenChange={(o) => setOpenDialog(o ? 'cancel' : null)}
           />
         </>

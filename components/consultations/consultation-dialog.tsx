@@ -25,7 +25,15 @@ import { useApiAction } from './use-api-action'
 
 const REASON_MAX = createConsultationSchema.shape.reason.maxLength ?? undefined
 
-type Common = { open: boolean; onOpenChange(open: boolean): void; occupied: Set<number> }
+type Common = {
+  open: boolean
+  onOpenChange(open: boolean): void
+  occupied: Set<number>
+  /** Where focus goes when the dialog closes; call `preventDefault()` to take over. */
+  onCloseAutoFocus?: (event: Event) => void
+}
+
+type Action = ReturnType<typeof useApiAction>
 
 type Props =
   | (Common & { mode: 'book'; defaults: { firstName: string; lastName: string } })
@@ -79,13 +87,14 @@ function CancelButton({ disabled }: { disabled: boolean }) {
 function BookForm({
   occupied,
   defaults,
+  action: { pending, run },
   onDone,
 }: {
   occupied: Set<number>
   defaults: { firstName: string; lastName: string }
+  action: Action
   onDone(): void
 }) {
-  const { pending, run } = useApiAction()
   const {
     register,
     control,
@@ -158,8 +167,17 @@ function BookForm({
   )
 }
 
-function RescheduleForm({ item, occupied, onDone }: { item: Consultation; occupied: Set<number>; onDone(): void }) {
-  const { pending, run } = useApiAction()
+function RescheduleForm({
+  item,
+  occupied,
+  action: { pending, run },
+  onDone,
+}: {
+  item: Consultation
+  occupied: Set<number>
+  action: Action
+  onDone(): void
+}) {
   const [slot, setSlot] = useState('')
 
   const submit = () =>
@@ -191,12 +209,22 @@ function RescheduleForm({ item, occupied, onDone }: { item: Consultation; occupi
  * resets the form and times always render client-side.
  */
 export function ConsultationDialog(props: Props) {
-  const { open, onOpenChange, occupied } = props
+  const { open, onOpenChange, occupied, onCloseAutoFocus } = props
   const close = () => onOpenChange(false)
+  // The request state lives here, above the form, so it survives the content unmounting. While a request
+  // is in flight the dialog can't be dismissed, so the double-submit guard can't be bypassed.
+  const action = useApiAction()
+  const blockWhilePending = (event: Event) => {
+    if (action.pending) event.preventDefault()
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => (next || !action.pending) && onOpenChange(next)}>
       <DialogContent
+        onEscapeKeyDown={blockWhilePending}
+        onPointerDownOutside={blockWhilePending}
+        onInteractOutside={blockWhilePending}
+        onCloseAutoFocus={onCloseAutoFocus}
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"
         {...(props.mode === 'book' ? { 'aria-describedby': undefined } : {})}
       >
@@ -205,7 +233,7 @@ export function ConsultationDialog(props: Props) {
             <DialogHeader>
               <DialogTitle>Book a consultation</DialogTitle>
             </DialogHeader>
-            <BookForm occupied={occupied} defaults={props.defaults} onDone={close} />
+            <BookForm occupied={occupied} defaults={props.defaults} action={action} onDone={close} />
           </>
         ) : (
           <>
@@ -216,7 +244,7 @@ export function ConsultationDialog(props: Props) {
                 <span className="block">Currently {formatSlot(props.item.scheduledAt)}</span>
               </DialogDescription>
             </DialogHeader>
-            <RescheduleForm item={props.item} occupied={occupied} onDone={close} />
+            <RescheduleForm item={props.item} occupied={occupied} action={action} onDone={close} />
           </>
         )}
       </DialogContent>
