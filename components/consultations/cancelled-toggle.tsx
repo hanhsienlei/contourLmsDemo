@@ -14,7 +14,7 @@ export function CancelledToggle({ count, children }: { count: number; children: 
         size="sm"
         className="justify-self-start"
         aria-expanded={open}
-        aria-controls={id}
+        aria-controls={open ? id : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         {open ? 'Hide cancelled' : `Show cancelled (${count})`}

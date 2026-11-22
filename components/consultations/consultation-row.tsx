@@ -57,7 +57,7 @@ export function ConsultationRow({
 
   return (
     <li
-      className={`flex items-center justify-between gap-3 rounded-lg border p-4 ${
+      className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
         cancelled ? 'bg-muted/40 text-muted-foreground' : ''
       }`}
     >
@@ -70,7 +70,7 @@ export function ConsultationRow({
           {note && <span className="text-muted-foreground">{note}</span>}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
         <StatusBadge state={state} />
         {(primary === 'complete' || primary === 'incomplete') && <CompleteButton item={item} />}
         {secondary.map((action) => (

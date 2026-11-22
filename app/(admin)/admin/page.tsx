@@ -55,6 +55,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         <TimeZoneNote />
       </header>
       <AdminConsultationTable items={items} now={now} />
+      {(q.cursor || nextCursor) && (
       <nav aria-label="Pagination" className="flex gap-2">
         {q.cursor && (
           <Button asChild variant="outline" size="sm">
@@ -67,6 +68,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
           </Button>
         )}
       </nav>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { groupForStudent, type DisplayState } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
@@ -67,7 +67,7 @@ export function ConsultationList({ items, occupied, defaults }: { items: Consult
       )}
       <section className="grid gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          Upcoming <Badge variant="secondary">{upcoming.length}</Badge>
+          Upcoming <span className={badgeVariants({ variant: 'secondary' })}>{upcoming.length}</span>
         </h2>
         {upcoming.length === 0 ? (
           <div className="grid justify-items-start gap-3">

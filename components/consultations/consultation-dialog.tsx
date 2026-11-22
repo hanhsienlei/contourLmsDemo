@@ -143,7 +143,7 @@ function BookForm({
         />
         <div className="flex justify-between gap-2 text-sm text-muted-foreground">
           <p id="reason-help">What would you like help with?</p>
-          <p className="tabular-nums">
+          <p className={reason.length > (REASON_MAX ?? Infinity) ? 'tabular-nums text-destructive' : 'tabular-nums'}>
             {reason.length}/{REASON_MAX}
           </p>
         </div>
