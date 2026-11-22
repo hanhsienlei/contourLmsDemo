@@ -21,6 +21,9 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Every route is per-user, so nothing is cached or prerendered across users;
+  // the page guards are the access boundary.
+  cacheComponents: false,
   async headers() {
     return [
       {
