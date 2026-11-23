@@ -70,15 +70,15 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 167 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 177 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
 ### Features
 
-- Sign up, log in and log out with Supabase Auth (from the `with-supabase` template).
+- Sign up (first name, last name, email, password), log in and log out with Supabase Auth (from the `with-supabase` template). The name is saved to the account's profile.
 - `/dashboard` (student): your consultations, grouped by display state: Needs your update, Upcoming and History. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation. Cancelled rows are muted, have no actions and sit behind "Show cancelled (n)" in History. A "Book a consultation" button opens the booking dialog.
-- Booking dialog (student): first name, last name, reason and a day plus a grid of 15-minute slots. The slots are limited to the booking window. The reschedule dialog is the same component in a second mode. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog.
+- Booking dialog (student): first name, last name, reason and a day plus a grid of 15-minute slots. The name is pre-filled from the profile and can be edited for that booking. The slots are limited to the booking window. The reschedule dialog is the same component in a second mode. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog.
 - `/admin` (admin): read-only table of all consultations, including cancelled ones, with the student's name, the account email and a display-state badge. Keyset paginated, 20 per page, with First page and Next page buttons. There is no total count, because keyset pagination doesn't produce one cheaply.
 - `/` redirects by role: admins to `/admin`, students to `/dashboard`. A user with no role row goes to `/no-access`.
 
@@ -218,12 +218,13 @@ Every student query includes `user_id = <verified user>`, so another student's b
 
 ### Hardened sign-up trigger
 
-`private.handle_new_user()` creates the `profiles` and `user_roles` rows on sign-up:
+`private.handle_new_user()` creates the `profiles` and `user_roles` rows on sign-up, copying the email and the first and last name from the sign-up metadata:
 
 - It lives in a `private` schema, which the Supabase API doesn't expose.
 - It's `security definer` with `set search_path = ''` and fully qualified names, so it can't be hijacked through the search path.
 - `EXECUTE` is revoked from `public`, `anon` and `authenticated`.
-- The role defaults to `student`. Nothing a user sends at sign-up can choose it.
+- The role defaults to `student`. Nothing a user sends at sign-up can choose it. The trigger reads only `first_name` and `last_name` from the metadata, which the user controls, so a `role` key there is ignored (an integration test sends one).
+- The names are trimmed, blank ones become null and anything over 100 characters is cut, so a bad value never blocks sign-up. The form already checks them with the same zod rules as the booking form (`studentNameSchema`).
 
 ### Booking window and business hours
 
@@ -240,7 +241,8 @@ Every student query includes `user_id = <verified user>`, so another student's b
 - "Complete" is the student's own tracking. It can be set at any time, even before the scheduled time, and toggling it doesn't re-check the booking window.
 - A past `scheduled` booking can still be cancelled. Status rules don't depend on time.
 - The dashboard groups by display state. A past `scheduled` booking shows as "Past, not marked" under Needs your update, and a past `completed` one is in History. Display state comes from the status and the time against now.
-- First and last name are stored on each consultation because the brief puts them on the form. The account email is in `profiles`, so the admin can see who booked even if the typed names differ.
+- The student's name belongs to the account: it is collected at sign-up and stored on `profiles`. Each consultation also keeps the name typed on its booking form, because the brief puts the name on that form. The form is pre-filled from the profile and the student can change it for one booking (for example a preferred name); that doesn't change the profile. The admin list shows the booking's name next to the account email.
+- Profile names are nullable. Admin and seeded staff accounts have none, and a student with no profile name gets an empty booking form to fill in.
 - Admins are staff accounts. They don't book, and they can't change anything. Each user has one role.
 - Times are stored as `timestamptz` (UTC). The client sends ISO 8601 with an offset, and the UI shows the browser's local time.
 - Slots must start on a 15-minute boundary. The API rejects anything else rather than rounding.
@@ -249,14 +251,17 @@ Every student query includes `user_id = <verified user>`, so another student's b
 
 ## 5. Schema and migrations
 
-There are two migrations, applied in order by `npm run db:reset`:
+There are three migrations, applied in order by `npm run db:reset`:
 
 - [`20261122075056_init.sql`](supabase/migrations/20261122075056_init.sql): enums, tables, constraints, triggers, RLS and grants.
-- [`20261122084321_lock_function_defaults.sql`](supabase/migrations/20261122084321_lock_function_defaults.sql): revokes the global `PUBLIC` EXECUTE default on functions (see §6). Types are generated into `lib/supabase/database.types.ts`.
+- [`20261122084321_lock_function_defaults.sql`](supabase/migrations/20261122084321_lock_function_defaults.sql): revokes the global `PUBLIC` EXECUTE default on functions (see §6).
+- [`20261123060000_profile_names.sql`](supabase/migrations/20261123060000_profile_names.sql): adds `first_name` and `last_name` to `profiles`, copies them in the sign-up trigger, and backfills existing accounts from their latest booking.
+
+Types are generated into `lib/supabase/database.types.ts`.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `profiles` | `user_id` (PK, FK `auth.users`, cascade), `email`, `created_at` | Email copied at sign-up so the admin list can show it |
+| `profiles` | `user_id` (PK, FK `auth.users`, cascade), `email`, `first_name` (nullable), `last_name` (nullable), `created_at` | Email and name copied at sign-up. The email is for the admin list; the name pre-fills the booking form |
 | `user_roles` | `user_id` (PK, FK `auth.users`, cascade), `role app_role` default `student`, `created_at` | One role per user |
 | `consultations` | `id` uuid PK, `user_id` (FK `profiles`, cascade), `first_name`, `last_name`, `reason`, `scheduled_at timestamptz`, `status consultation_status` default `scheduled`, `created_at`, `updated_at` | Bookings |
 
@@ -333,6 +338,7 @@ Nothing in the planned scope was cut. Admin pagination is built. Next steps:
 - Put the role in the JWT with a custom access token hook, to drop the per-request role lookup (and accept the staleness trade-off).
 - Add RLS read policies back as a second layer of protection under the service, with pgTAP tests for them.
 - Keep `profiles.email` in sync when a user changes their email.
+- A profile page where a student can change their saved name. Today it is set once at sign-up.
 - API rate limiting (for example Upstash).
 - An exclusion constraint against overlapping bookings once durations exist.
 - A consultant role with `consultant_id`, and consultant-side rescheduling.

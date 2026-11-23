@@ -14,10 +14,16 @@ const scheduledAt = z
   .pipe(z.iso.datetime({ offset: true, error: 'Choose a day and time' }))
   .refine((s) => isSlotAligned(new Date(s)), { error: 'Choose a time on the quarter hour' });
 
-export const createConsultationSchema = z
+/** A student's name: on the sign-up form (saved to the profile) and on each booking. */
+export const studentNameSchema = z
   .object({
     firstName: requiredText('First name', 100),
     lastName: requiredText('Last name', 100),
+  })
+  .strict();
+
+export const createConsultationSchema = studentNameSchema
+  .extend({
     reason: requiredText('Reason', 1000, 'Tell us what the consultation is about'),
     scheduledAt,
   })

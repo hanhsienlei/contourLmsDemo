@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createConsultationSchema,
+  studentNameSchema,
   updateConsultationSchema,
   adminListQuerySchema,
   encodeCursor,
@@ -97,5 +98,25 @@ describe('parseAdminListQuery', () => {
   it('returns null for a bad limit or an undecodable cursor', () => {
     expect(parseAdminListQuery({ limit: '101' })).toBeNull();
     expect(parseAdminListQuery({ cursor: 'garbage' })).toBeNull();
+  });
+});
+
+describe('studentNameSchema (sign-up)', () => {
+  it('trims both names', () => {
+    expect(studentNameSchema.parse({ firstName: '  Ada ', lastName: ' Lovelace  ' })).toEqual({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+    });
+  });
+
+  it('rejects a blank first name with the student-facing message', () => {
+    const r = studentNameSchema.safeParse({ firstName: '   ', lastName: 'Lovelace' });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].message).toBe('First name is required');
+  });
+
+  it('rejects a last name over 100 characters', () => {
+    const r = studentNameSchema.safeParse({ firstName: 'Ada', lastName: 'x'.repeat(101) });
+    expect(r.error?.issues[0].message).toBe('Last name must be 100 characters or fewer');
   });
 });

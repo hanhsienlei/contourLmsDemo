@@ -2,7 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { badgeVariants } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { groupForStudent, type DisplayState } from '@/lib/consultations/display'
-import type { Consultation } from '@/lib/consultations/service'
+import type { Consultation, StudentName } from '@/lib/consultations/service'
 import { BookConsultationButton } from './book-consultation-button'
 import { CancelledToggle } from './cancelled-toggle'
 import { ConsultationRow } from './consultation-row'
@@ -10,7 +10,7 @@ import { ConsultationRow } from './consultation-row'
 type BookProps = {
   /** Epoch ms of the student's active slots. */
   occupied: number[]
-  defaults: { firstName: string; lastName: string }
+  defaults: StudentName
 }
 
 function Rows({

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createAuthUser, deleteAuthUser, pgPool } from './helpers/db'
-import { book, cancel, listAll, listOwn, reschedule, setCompleted } from '@/lib/consultations/service'
+import { book, cancel, getProfileName, listAll, listOwn, reschedule, setCompleted } from '@/lib/consultations/service'
 
 const HOUR = 3_600_000
 const stamp = Date.now()
@@ -30,6 +30,25 @@ beforeAll(async () => {
 afterAll(async () => {
   for (const id of [A, B, C, D]) await deleteAuthUser(id)
   await pgPool.end()
+})
+
+describe('getProfileName', () => {
+  it("returns the account's sign-up name", async () => {
+    const id = await createAuthUser(`svc-n-${stamp}@example.com`, undefined, { first_name: 'Ada', last_name: 'Lovelace' })
+    try {
+      expect(await getProfileName(id)).toEqual({ firstName: 'Ada', lastName: 'Lovelace' })
+    } finally {
+      await deleteAuthUser(id)
+    }
+  })
+
+  it('returns empty strings when the account has no name', async () => {
+    expect(await getProfileName(A)).toEqual({ firstName: '', lastName: '' })
+  })
+
+  it('returns empty strings for an unknown user', async () => {
+    expect(await getProfileName(crypto.randomUUID())).toEqual({ firstName: '', lastName: '' })
+  })
 })
 
 describe('book', () => {

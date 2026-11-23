@@ -36,11 +36,13 @@ async function deleteExistingDemoUsers() {
   }
 }
 
-async function createUser(email: string): Promise<string> {
+async function createUser(email: string, name?: { first_name: string; last_name: string }): Promise<string> {
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     password: PASSWORD,
     email_confirm: true,
+    // Same metadata the sign-up form sends; the trigger copies it to profiles.
+    user_metadata: name,
   })
   if (error || !data.user) throw error ?? new Error(`createUser failed for ${email}`)
   return data.user.id
@@ -50,8 +52,8 @@ async function main() {
   await deleteExistingDemoUsers()
 
   const adminId = await createUser(EMAILS.admin)
-  const aliceId = await createUser(EMAILS.alice)
-  const bobId = await createUser(EMAILS.bob)
+  const aliceId = await createUser(EMAILS.alice, { first_name: 'Alice', last_name: 'Nguyen' })
+  const bobId = await createUser(EMAILS.bob, { first_name: 'Bob', last_name: 'Smith' })
 
   const { error: roleErr } = await supabase
     .from('user_roles')
