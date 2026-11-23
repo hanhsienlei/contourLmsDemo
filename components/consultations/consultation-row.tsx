@@ -7,6 +7,7 @@ import {
   ROW_ACTION_LABEL,
   actionAriaLabel,
   actionVariant,
+  detailsActions,
   rowLayout,
   type DialogAction,
   type DisplayState,
@@ -15,13 +16,14 @@ import type { Consultation } from '@/lib/consultations/types'
 import { cn } from '@/lib/utils'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
+import { ConsultationDetailsDialog, ReasonButton } from './consultation-details'
 import { ConsultationDialog } from './consultation-dialog'
 import { ConsultationTime } from './consultation-time'
 import { useSlotLabel } from './local-time'
 import { RowActionsMenu } from './row-actions-menu'
 import { StatusBadge } from './status-badge'
 
-type OpenDialog = 'reschedule' | 'cancel' | null
+type OpenDialog = 'details' | 'reschedule' | 'cancel' | null
 
 export function ConsultationRow({
   item,
@@ -47,7 +49,7 @@ export function ConsultationRow({
   const menuClass = menuVisibility === 'below-sm' ? 'sm:hidden' : undefined
   const cancelled = state === 'cancelled'
 
-  const openFromButton = (action: DialogAction, button: HTMLElement) => {
+  const openFromButton = (action: DialogAction | 'details', button: HTMLElement) => {
     opener.current = button
     setOpenDialog(action)
   }
@@ -69,9 +71,7 @@ export function ConsultationRow({
       )}
     >
       <div className="grid min-w-0 gap-1">
-        <p className="line-clamp-2 break-words font-semibold" title={item.reason}>
-          {item.reason}
-        </p>
+        <ReasonButton reason={item.reason} onClick={(e) => openFromButton('details', e.currentTarget)} />
         <ConsultationTime iso={item.scheduledAt} note={note} />
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
@@ -124,6 +124,38 @@ export function ConsultationRow({
           </RowActionsMenu>
         )}
       </div>
+      <ConsultationDetailsDialog
+        item={item}
+        state={state}
+        open={openDialog === 'details'}
+        onOpenChange={(o) => setOpenDialog(o ? 'details' : null)}
+        // Switching to Reschedule or Cancel: their dialog takes focus, so don't pull it back to the row.
+        onCloseAutoFocus={(e) => (openDialog === null ? returnFocus(e) : e.preventDefault())}
+        actions={
+          cancelled
+            ? undefined
+            : detailsActions(state).map((action) =>
+                action === 'complete' || action === 'incomplete' ? (
+                  <CompleteButton
+                    key={action}
+                    item={item}
+                    action={action}
+                    variant={actionVariant(state, action)}
+                    onDone={() => setOpenDialog(null)}
+                  />
+                ) : (
+                  <Button
+                    key={action}
+                    variant={actionVariant(state, action)}
+                    size="sm"
+                    onClick={() => setOpenDialog(action)}
+                  >
+                    {ROW_ACTION_LABEL[action]}
+                  </Button>
+                ),
+              )
+        }
+      />
       {!cancelled && (
         <>
           <ConsultationDialog

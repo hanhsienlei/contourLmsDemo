@@ -17,6 +17,7 @@ import {
   moreActionsAriaLabel,
   sectionPageHref,
   actionVariant,
+  detailsActions,
 } from '@/lib/consultations/display'
 import type { ConsultationStatus } from '@/lib/consultations/rules'
 
@@ -287,5 +288,14 @@ describe('actionVariant', () => {
       const filled = actionsFor(state).visible.filter((a) => actionVariant(state, a) === 'default')
       expect(filled.length).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('detailsActions', () => {
+  it('offers every row action, the ⋯ menu ones included, in row order', () => {
+    expect(detailsActions('upcoming')).toEqual(['complete', 'reschedule', 'cancel'])
+    expect(detailsActions('needs_update')).toEqual(['complete', 'reschedule', 'cancel'])
+    expect(detailsActions('completed')).toEqual(['incomplete'])
+    expect(detailsActions('cancelled')).toEqual([])
   })
 })

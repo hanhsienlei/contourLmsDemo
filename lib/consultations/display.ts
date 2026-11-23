@@ -156,6 +156,12 @@ export function actionVariant(state: DisplayState, action: RowAction): ActionVar
   return 'outline'
 }
 
+/** Actions in the details dialog's footer (spec §6.6): all of the row's, including the ⋯ menu's. */
+export function detailsActions(state: DisplayState): RowAction[] {
+  const { visible, menu } = actionsFor(state)
+  return [...visible, ...menu]
+}
+
 /** Actions that open a dialog (the others run inline). */
 export type DialogAction = Extract<RowAction, 'reschedule' | 'cancel'>
 const isDialogAction = (a: RowAction): a is DialogAction => a === 'reschedule' || a === 'cancel'
