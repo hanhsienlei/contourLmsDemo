@@ -135,17 +135,6 @@ export function activeSlotKeys(items: readonly Pick<Consultation, 'status' | 'sc
   return new Set(items.filter((i) => i.status !== 'cancelled').map((i) => Date.parse(i.scheduledAt)));
 }
 
-/** Name to prefill on a new booking: from the most recently created row, whatever its status. */
-export function prefillName(
-  items: readonly Pick<Consultation, 'firstName' | 'lastName' | 'createdAt'>[],
-): { firstName: string; lastName: string } {
-  let latest: (typeof items)[number] | undefined;
-  for (const item of items) {
-    if (!latest || Date.parse(item.createdAt) > Date.parse(latest.createdAt)) latest = item;
-  }
-  return { firstName: latest?.firstName ?? '', lastName: latest?.lastName ?? '' };
-}
-
 export type RowAction = 'complete' | 'incomplete' | 'reschedule' | 'cancel';
 
 /** Visible text of each row action's button or menu item. */

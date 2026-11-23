@@ -57,6 +57,19 @@ function assertBookable(scheduledAt: string, now: Date): string {
   return d.toISOString()
 }
 
+export type StudentName = { firstName: string; lastName: string }
+
+/** The name saved on the student's account at sign-up; pre-fills the booking form. Empty if none. */
+export async function getProfileName(userId: string): Promise<StudentName> {
+  const { data, error } = await createAdminClient()
+    .from('profiles')
+    .select('first_name, last_name')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw mapDbError(error)
+  return { firstName: data?.first_name ?? '', lastName: data?.last_name ?? '' }
+}
+
 export async function listOwn(userId: string): Promise<Consultation[]> {
   const { data, error } = await createAdminClient()
     .from('consultations')

@@ -10,7 +10,6 @@ import {
   dayKey,
   initialDay,
   activeSlotKeys,
-  prefillName,
   actionsFor,
   rowLayout,
   ROW_ACTION_LABEL,
@@ -217,22 +216,6 @@ describe('activeSlotKeys', () => {
     const a = activeSlotKeys([{ status: 'scheduled', scheduledAt: '2030-01-12T00:00:00+00:00' }]);
     const b = activeSlotKeys([{ status: 'scheduled', scheduledAt: '2030-01-12T00:00:00.000Z' }]);
     expect([...a]).toEqual([...b]);
-  });
-});
-
-describe('prefillName', () => {
-  it('uses the most recently created row whatever its status', () => {
-    expect(
-      prefillName([
-        { firstName: 'Old', lastName: 'Row', createdAt: '2030-01-01T00:00:00Z' },
-        { firstName: 'New', lastName: 'Row', createdAt: '2030-01-05T00:00:00Z' },
-        { firstName: 'Mid', lastName: 'Row', createdAt: '2030-01-03T00:00:00Z' },
-      ]),
-    ).toEqual({ firstName: 'New', lastName: 'Row' });
-  });
-
-  it('is empty with no rows', () => {
-    expect(prefillName([])).toEqual({ firstName: '', lastName: '' });
   });
 });
 

@@ -41,6 +41,38 @@ describe('schema', () => {
     expect(r.rows[0].role).toBe('student')
   })
 
+  it('sign-up trigger copies the name from the sign-up metadata, trimmed', async () => {
+    const id = await createAuthUser(`t-${crypto.randomUUID()}@test.local`, undefined, {
+      first_name: '  Ada ',
+      last_name: 'Lovelace  ',
+    })
+    users.push(id)
+    const p = await pgPool.query('select first_name, last_name from public.profiles where user_id = $1', [id])
+    expect(p.rows[0]).toEqual({ first_name: 'Ada', last_name: 'Lovelace' })
+  })
+
+  it('sign-up trigger stores null for a missing or blank name and cuts long ones, never failing sign-up', async () => {
+    const none = await createAuthUser(`t-${crypto.randomUUID()}@test.local`)
+    const odd = await createAuthUser(`t-${crypto.randomUUID()}@test.local`, undefined, {
+      first_name: '   ',
+      last_name: 'x'.repeat(150),
+      role: 'admin',
+    })
+    users.push(none, odd)
+    const p = await pgPool.query(
+      'select user_id, first_name, last_name from public.profiles where user_id = any($1)', [[none, odd]])
+    const byId = Object.fromEntries(p.rows.map((r) => [r.user_id, r]))
+    expect(byId[none]).toMatchObject({ first_name: null, last_name: null })
+    expect(byId[odd]).toMatchObject({ first_name: null, last_name: 'x'.repeat(100) })
+    const r = await pgPool.query('select role from public.user_roles where user_id = $1', [odd])
+    expect(r.rows[0].role).toBe('student')
+  })
+
+  it('rejects a whitespace-only profile name', async () => {
+    await expectCode(
+      pgPool.query(`update public.profiles set first_name = '  ' where user_id = $1`, [uid]), '23514')
+  })
+
   it('rejects misaligned scheduled_at, including fractional seconds', async () => {
     await expectCode(insert(uid, '2030-01-01T10:14:59.6Z'), '23514')
     await expectCode(insert(uid, '2030-01-01T10:10:00Z'), '23514')

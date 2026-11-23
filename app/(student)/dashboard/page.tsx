@@ -2,16 +2,15 @@ import { BookConsultationButton } from '@/components/consultations/book-consulta
 import { TimeZoneNote } from '@/components/consultations/time-zone-note'
 import { ConsultationList } from '@/components/consultations/consultation-list'
 import { requireRolePage } from '@/lib/auth/guards'
-import { activeSlotKeys, prefillName } from '@/lib/consultations/display'
-import { listOwn } from '@/lib/consultations/service'
+import { activeSlotKeys } from '@/lib/consultations/display'
+import { getProfileName, listOwn } from '@/lib/consultations/service'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
 export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
   const { userId } = await requireRolePage('student')
-  const [items, sp] = await Promise.all([listOwn(userId), searchParams])
+  const [items, defaults, sp] = await Promise.all([listOwn(userId), getProfileName(userId), searchParams])
   const occupied = [...activeSlotKeys(items)]
-  const defaults = prefillName(items)
 
   return (
     <div className="grid gap-6">

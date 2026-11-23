@@ -11,11 +11,16 @@ function secretClient() {
   )
 }
 
-export async function createAuthUser(email: string, password?: string): Promise<string> {
+export async function createAuthUser(
+  email: string,
+  password?: string,
+  userMetadata?: Record<string, unknown>,
+): Promise<string> {
   const { data, error } = await secretClient().auth.admin.createUser({
     email,
     password: password ?? 'Password123!',
     email_confirm: true,
+    user_metadata: userMetadata,
   })
   if (error || !data.user) throw error ?? new Error('createUser returned no user')
   return data.user.id

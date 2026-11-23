@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api/client'
 import { createConsultationSchema, type CreateConsultationInput } from '@/lib/consultations/schema'
-import type { Consultation } from '@/lib/consultations/service'
+import type { Consultation, StudentName } from '@/lib/consultations/service'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -36,7 +36,7 @@ type Common = {
 type Action = ReturnType<typeof useApiAction>
 
 type Props =
-  | (Common & { mode: 'book'; defaults: { firstName: string; lastName: string } })
+  | (Common & { mode: 'book'; defaults: StudentName })
   | (Common & { mode: 'reschedule'; item: Consultation })
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -91,7 +91,7 @@ function BookForm({
   onDone,
 }: {
   occupied: Set<number>
-  defaults: { firstName: string; lastName: string }
+  defaults: StudentName
   action: Action
   onDone(): void
 }) {

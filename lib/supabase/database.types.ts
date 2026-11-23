@@ -45,14 +45,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "created_at": string,"email": string,"user_id": string
+                    "created_at": string,"email": string,"first_name": string | null,"last_name": string | null,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"email": string,"user_id": string
+                    "created_at"?: string,"email": string,"first_name"?: string | null,"last_name"?: string | null,"user_id": string
                   }
                   Update: {
-                    "created_at"?: string,"email"?: string,"user_id"?: string
+                    "created_at"?: string,"email"?: string,"first_name"?: string | null,"last_name"?: string | null,"user_id"?: string
                   }
                   Relationships: [
                     

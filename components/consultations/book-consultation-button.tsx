@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import type { StudentName } from '@/lib/consultations/service'
 import { ConsultationDialog } from './consultation-dialog'
 
 /** "Book a consultation" button that owns the book dialog. `occupied` is epoch ms from the server. */
@@ -13,7 +14,7 @@ export function BookConsultationButton({
 }: {
   openOnLoad?: boolean
   occupied: number[]
-  defaults: { firstName: string; lastName: string }
+  defaults: StudentName
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(openOnLoad)
