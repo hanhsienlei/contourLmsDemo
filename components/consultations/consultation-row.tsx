@@ -6,6 +6,7 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import {
   ROW_ACTION_LABEL,
   actionAriaLabel,
+  actionVariant,
   rowLayout,
   type DialogAction,
   type DisplayState,
@@ -68,18 +69,20 @@ export function ConsultationRow({
       )}
     >
       <div className="grid min-w-0 gap-1">
-        <p className="truncate font-medium" title={item.reason}>
+        <p className="line-clamp-2 break-words font-semibold" title={item.reason}>
           {item.reason}
         </p>
         <ConsultationTime iso={item.scheduledAt} note={note} />
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
         <StatusBadge state={state} />
-        {(primary === 'complete' || primary === 'incomplete') && <CompleteButton item={item} action={primary} />}
+        {(primary === 'complete' || primary === 'incomplete') && (
+          <CompleteButton item={item} action={primary} variant={actionVariant(state, primary)} />
+        )}
         {secondary.map((action) => (
           <Button
             key={action}
-            variant="outline"
+            variant={actionVariant(state, action)}
             size="sm"
             className="hidden sm:inline-flex"
             aria-label={actionAriaLabel(action, slot)}

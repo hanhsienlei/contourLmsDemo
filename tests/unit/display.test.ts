@@ -16,6 +16,7 @@ import {
   slotButtonState,
   moreActionsAriaLabel,
   sectionPageHref,
+  actionVariant,
 } from '@/lib/consultations/display'
 import type { ConsultationStatus } from '@/lib/consultations/rules'
 
@@ -265,5 +266,26 @@ describe('sectionPageHref', () => {
   })
   it('ignores repeated params and encodes cursors', () => {
     expect(sectionPageHref({ upcoming: ['a', 'b'] }, 'completed', 'a+b/=')).toBe('/dashboard?completed=a%2Bb%2F%3D')
+  })
+})
+
+describe('actionVariant', () => {
+  it.each([
+    ['upcoming', 'complete', 'outline'],
+    ['upcoming', 'reschedule', 'default'],
+    ['upcoming', 'cancel', 'ghost'],
+    ['needs_update', 'complete', 'default'],
+    ['needs_update', 'reschedule', 'outline'],
+    ['needs_update', 'cancel', 'outline'],
+    ['completed', 'incomplete', 'ghost'],
+  ] as const)('%s / %s is %s', (state, action, variant) => {
+    expect(actionVariant(state, action)).toBe(variant)
+  })
+
+  it('fills at most one visible action per state', () => {
+    for (const state of ['upcoming', 'needs_update', 'completed', 'cancelled'] as const) {
+      const filled = actionsFor(state).visible.filter((a) => actionVariant(state, a) === 'default')
+      expect(filled.length).toBeLessThanOrEqual(1)
+    }
   })
 })

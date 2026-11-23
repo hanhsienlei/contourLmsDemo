@@ -142,6 +142,20 @@ export function actionsFor(state: DisplayState): { visible: RowAction[]; menu: R
   }
 }
 
+export type ActionVariant = 'default' | 'outline' | 'ghost'
+
+/**
+ * Button style of a row action (spec §4). At most one filled ('default') action per row: what the
+ * student most likely wants next. Reschedule before the booking, Mark complete after it.
+ */
+export function actionVariant(state: DisplayState, action: RowAction): ActionVariant {
+  if (state === 'upcoming' && action === 'reschedule') return 'default'
+  if (state === 'needs_update' && action === 'complete') return 'default'
+  if (state === 'upcoming' && action === 'cancel') return 'ghost'
+  if (action === 'incomplete') return 'ghost'
+  return 'outline'
+}
+
 /** Actions that open a dialog (the others run inline). */
 export type DialogAction = Extract<RowAction, 'reschedule' | 'cancel'>
 const isDialogAction = (a: RowAction): a is DialogAction => a === 'reschedule' || a === 'cancel'
