@@ -1,55 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-import { assertLocalSupabaseUrl } from './local-guard'
-import { atBusinessTime } from '../lib/consultations/rules'
+import { at, createUser, deleteUsersByEmail, PASSWORD, supabase } from './seed-common'
 
-process.loadEnvFile('.env.local')
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const secret = process.env.SUPABASE_SECRET_KEY!
-assertLocalSupabaseUrl(url)
-
-const supabase = createClient(url, secret, {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
-
-const PASSWORD = 'Password123!'
 const EMAILS = { admin: 'admin@demo.local', alice: 'alice@demo.local', bob: 'bob@demo.local' }
 
-// Melbourne wall-clock times relative to today, all inside business hours
-// (8:00 am to 8:00 pm) and on the quarter hour, so seeded bookings look like
-// ones a student could actually have made.
-const today = new Date()
-const at = (days: number, hour: number, minute = 0) => atBusinessTime(today, days, hour, minute).toISOString()
-
-async function deleteExistingDemoUsers() {
-  const wanted = new Set(Object.values(EMAILS))
-  for (let page = 1; ; page++) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-    for (const u of data.users) {
-      if (u.email && wanted.has(u.email)) {
-        const { error: delErr } = await supabase.auth.admin.deleteUser(u.id)
-        if (delErr) throw delErr
-      }
-    }
-    if (data.users.length < 1000) break
-  }
-}
-
-async function createUser(email: string, name?: { first_name: string; last_name: string }): Promise<string> {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password: PASSWORD,
-    email_confirm: true,
-    // Same metadata the sign-up form sends; the trigger copies it to profiles.
-    user_metadata: name,
-  })
-  if (error || !data.user) throw error ?? new Error(`createUser failed for ${email}`)
-  return data.user.id
-}
-
 async function main() {
-  await deleteExistingDemoUsers()
+  await deleteUsersByEmail(Object.values(EMAILS))
 
   const adminId = await createUser(EMAILS.admin)
   const aliceId = await createUser(EMAILS.alice, { first_name: 'Alice', last_name: 'Nguyen' })

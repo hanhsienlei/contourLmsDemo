@@ -55,6 +55,7 @@ The seed gives Alice a booking in every state (upcoming and past `scheduled`, `c
 
 - `npm run db:seed` deletes and recreates only the demo users and their bookings. The schema is untouched.
 - `npm run db:reset` wipes the database, reapplies the migrations and seeds again.
+- `npm run db:seed:bulk` adds one more student, `sam@demo.local` (Sam Lee, same password), with enough bookings to page every tab: 45 upcoming, 25 needs update, 30 completed and 22 cancelled. It is opt-in and leaves the other demo accounts alone; re-running it replaces Sam's bookings.
 
 You can also sign up with any email. Email confirmation is off locally, so a new account goes straight in as a student.
 
