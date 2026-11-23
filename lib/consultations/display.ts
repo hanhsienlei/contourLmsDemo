@@ -1,5 +1,5 @@
 import { format, formatDistanceStrict } from 'date-fns';
-import type { Consultation } from './service';
+import type { Consultation } from './types';
 
 /**
  * How a consultation is presented, derived from status and time.

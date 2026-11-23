@@ -2,7 +2,7 @@
 
 import { apiFetch } from '@/lib/api/client'
 import { ROW_ACTION_LABEL, actionAriaLabel } from '@/lib/consultations/display'
-import type { Consultation } from '@/lib/consultations/service'
+import type { Consultation } from '@/lib/consultations/types'
 import { Button } from '@/components/ui/button'
 import { useSlotLabel } from './local-time'
 import { useApiAction } from './use-api-action'

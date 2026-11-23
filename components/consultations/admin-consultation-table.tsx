@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { displayState, type DisplayState } from '@/lib/consultations/display'
-import type { AdminConsultation } from '@/lib/consultations/service'
+import type { AdminConsultation } from '@/lib/consultations/types'
 import { ConsultationTime } from './consultation-time'
 import { StatusBadge } from './status-badge'
 

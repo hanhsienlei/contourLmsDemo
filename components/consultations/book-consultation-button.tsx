@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import type { StudentName } from '@/lib/consultations/service'
+import type { StudentName } from '@/lib/consultations/types'
 import { ConsultationDialog } from './consultation-dialog'
 
 /** "Book a consultation" button that owns the book dialog. `occupied` is epoch ms from the server. */

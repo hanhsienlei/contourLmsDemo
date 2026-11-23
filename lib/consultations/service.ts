@@ -9,18 +9,9 @@ import {
   type ConsultationStatus,
 } from './rules'
 import { encodeCursor, type CreateConsultationInput, type Cursor } from './schema'
+import type { AdminConsultation, Consultation, StudentName } from './types'
 
-export type Consultation = {
-  id: string
-  firstName: string
-  lastName: string
-  reason: string
-  scheduledAt: string
-  status: ConsultationStatus
-  createdAt: string
-  updatedAt: string
-}
-export type AdminConsultation = Consultation & { email: string }
+export type { AdminConsultation, Consultation, StudentName } from './types'
 
 const COLUMNS = 'id, user_id, first_name, last_name, reason, scheduled_at, status, created_at, updated_at'
 
@@ -56,8 +47,6 @@ function assertBookable(scheduledAt: string, now: Date): string {
   if (!isWithinBusinessHours(d)) throw errors.validation(HOURS_MESSAGE)
   return d.toISOString()
 }
-
-export type StudentName = { firstName: string; lastName: string }
 
 /** The name saved on the student's account at sign-up; pre-fills the booking form. Empty if none. */
 export async function getProfileName(userId: string): Promise<StudentName> {

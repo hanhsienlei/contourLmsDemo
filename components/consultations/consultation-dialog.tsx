@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api/client'
 import { createConsultationSchema, type CreateConsultationInput } from '@/lib/consultations/schema'
-import type { Consultation, StudentName } from '@/lib/consultations/service'
+import type { Consultation, StudentName } from '@/lib/consultations/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

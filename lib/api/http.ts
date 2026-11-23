@@ -44,9 +44,10 @@ export function mapDbError(e: { code?: string; message: string }): ApiError {
 }
 
 export function assertSameOrigin(req: Request): void {
-  const type = req.headers.get('content-type') ?? '';
+  // The media type is everything before the first ';' (parameters such as charset follow it).
+  const mediaType = (req.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
   const origin = req.headers.get('origin');
-  if (!type.toLowerCase().startsWith('application/json')) throw errors.forbidden();
+  if (mediaType !== 'application/json') throw errors.forbidden();
   if (!origin || origin !== new URL(req.url).origin) throw errors.forbidden();
 }
 

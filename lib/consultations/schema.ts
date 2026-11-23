@@ -45,7 +45,7 @@ export const adminListQuerySchema = z
 
 export type Cursor = { scheduledAt: string; id: string };
 
-const cursorSchema = z.object({ scheduledAt: z.iso.datetime({ offset: true }), id: z.string().uuid() });
+const cursorSchema = z.object({ scheduledAt: z.iso.datetime({ offset: true }), id: z.uuid() });
 
 export function encodeCursor(c: Cursor): string {
   return Buffer.from(JSON.stringify(c), 'utf8').toString('base64url');

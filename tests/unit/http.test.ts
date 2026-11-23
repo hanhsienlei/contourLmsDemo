@@ -48,6 +48,19 @@ describe('assertSameOrigin', () => {
       expect.objectContaining({ status: 403 }),
     );
   });
+  it('accepts the media type in any case and with spaces before parameters', () => {
+    expect(() =>
+      assertSameOrigin(mk({ origin: 'http://localhost:3000', 'content-type': 'Application/JSON ; charset=utf-8' })),
+    ).not.toThrow();
+  });
+  it.each(['application/jsonx', 'application/json-patch+json', 'application/json5'])(
+    'rejects %s, which only starts with application/json',
+    (type) => {
+      expect(() => assertSameOrigin(mk({ origin: 'http://localhost:3000', 'content-type': type }))).toThrow(
+        expect.objectContaining({ status: 403 }),
+      );
+    },
+  );
 });
 
 describe('parseJson', () => {
