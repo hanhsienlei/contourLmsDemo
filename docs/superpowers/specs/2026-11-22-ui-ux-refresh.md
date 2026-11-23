@@ -3,6 +3,7 @@
 Date: 2026-11-22
 Status: approved by Hanna, ready to build
 Amends: `2026-11-22-mini-lms-design.md` §10 (UI) and the "Upcoming vs past" call in §17. Everything else in that spec still holds. When this file and §10 disagree, this file wins.
+Revised: 2026-11-23 (readability round): action emphasis (§4), row anatomy and the details dialog (§6.1, §6.6), and admin status tabs (§6.5). The admin tabs add an optional `group` parameter to the admin API, as the §6.5 stretch allows; without it the API answers as before.
 
 ## 1. Purpose
 
@@ -42,12 +43,14 @@ Derived from `status` and `scheduledAt` against `now`. Implement as `displayStat
 
 | Display state | Rule | Badge (label, style) | Actions |
 |---|---|---|---|
-| `upcoming` | `scheduled` and `scheduledAt >= now` | "Scheduled", neutral (`secondary`) | Mark complete, Reschedule, Cancel (all visible on desktop) |
-| `needs_update` | `scheduled` and `scheduledAt < now` | "Past, not marked", warning: amber text and border on a light amber background, using Tailwind theme-safe classes that work in dark mode | Mark complete, Reschedule visible; Cancel inside ⋯ |
-| `completed` | `completed` | "Completed", success: green text on a light green background | Mark incomplete |
+| `upcoming` | `scheduled` and `scheduledAt >= now` | "Scheduled", neutral (`secondary`) | Mark complete (outline), **Reschedule (filled)**, Cancel (ghost); all visible on desktop |
+| `needs_update` | `scheduled` and `scheduledAt < now` | "Past, not marked", warning: amber text and border on a light amber background, using Tailwind theme-safe classes that work in dark mode | **Mark complete (filled)**, Reschedule (outline) visible; Cancel inside ⋯ |
+| `completed` | `completed` | "Completed", success: green text on a light green background | Mark incomplete (ghost) |
 | `cancelled` | `cancelled` | "Cancelled", `outline`, muted text | None |
 
 `StatusBadge` takes a display state, not a raw status. The admin table uses the same badges.
+
+Emphasis: each row has at most one filled button, the thing the student most likely wants next. Before the booking that is Reschedule; afterwards it is Mark complete. A completed booking needs nothing, so Mark incomplete is a quiet ghost button. Cancel on an upcoming row is ghost so it doesn't compete. The mapping is `actionVariant(state, action)` in `display.ts`.
 
 ## 5. Shared pieces
 
@@ -55,7 +58,7 @@ Derived from `status` and `scheduledAt` against `now`. Implement as `displayStat
 |---|---|---|
 | `displayState`, `groupForStudent` | `lib/consultations/display.ts` (new) | Pure functions. `groupForStudent(items, now)` returns `{ needsUpdate, upcoming, history: { completed, cancelled } }` with the sort orders in §6.1. Unit tests in `tests/unit/display.test.ts`, including the boundary where `scheduledAt === now`. |
 | `StatusBadge` | existing | Accepts a display state; styles per §4. |
-| `ConsultationTime` | new, replaces direct `LocalTime` use in rows | Two lines: absolute time (medium weight), then relative time (muted, small). Renders `<time dateTime>`. Hydration-safe. |
+| `ConsultationTime` | new, replaces direct `LocalTime` use in rows | Two lines: absolute time (`text-sm`, normal weight), then relative time (muted, small). Renders `<time dateTime>`. Hydration-safe. The row's reason is the only bold text. |
 | `TimeZoneNote` | new | One muted line: clock icon plus "Times in {city} time ({abbr})". City from `Intl.DateTimeFormat().resolvedOptions().timeZone` (last segment, underscores to spaces); abbreviation from `timeZoneName: 'short'` with locale `en-AU`. Falls back to the IANA name. Hydration-safe. |
 | `CompleteButton` | new, replaces `StatusToggle` | A `Button` (`variant="outline"`, `size="sm"`): "Mark complete" when scheduled, "Mark incomplete" when completed. Same PATCH call and toasts as today ("Marked complete", "Marked incomplete"). |
 | `RowActionsMenu` | new | `DropdownMenu` behind a ghost icon button (`aria-label="More actions for consultation on {slot}"`). Holds Cancel for `needs_update` rows, and every secondary action under `sm`. |
@@ -76,7 +79,7 @@ Layout, top to bottom:
 
 Row anatomy (all sections):
 
-- Title: the **reason** (one line, truncated with `title` attribute holding the full text). The first and last name are **not** shown on the student's own rows.
+- Title: the **reason**, semibold, up to **two lines** then "…". It is a button that opens the details dialog (§6.6), which shows the full text. No `title` tooltip: touch and keyboard users can't reach one. The first and last name are **not** shown on the student's own rows.
 - Second line: `ConsultationTime` (absolute plus relative).
 - Right side: `StatusBadge`, then the actions from §4.
 - Cancelled rows: muted background and text, no actions.
@@ -125,7 +128,7 @@ Acceptance criteria:
 Same component, showing only the "When" fieldset.
 
 1. Title "Reschedule consultation".
-2. Description: the reason in medium weight, then "Currently {absolute time}".
+2. Description: the reason in medium weight, up to two lines, then "Currently {absolute time}".
 3. Day defaults to the booking's own day if it is still bookable, otherwise the first bookable day.
 4. The booking's current slot is shown as "Current" and disabled. Other occupied slots are disabled as in §6.2.
 5. Footer: "Cancel" and the submit button: "Reschedule" until a slot is chosen, then "Move to {absolute time}"; "Rescheduling…" while sending.
@@ -147,18 +150,33 @@ No change in copy or behaviour ("Cancel this consultation?", "Keep it", destruct
 2. Table columns:
    - **Time:** `ConsultationTime` (absolute plus relative).
    - **Student:** name as entered on the first line, account email muted on the second.
-   - **Reason:** single line, truncated, full text in `title`.
+   - **Reason:** up to two lines, then "…". A button that opens the read-only details dialog (§6.6).
    - **Status:** `StatusBadge` with display state, so past unmarked bookings read "Past, not marked".
 3. Rows with `needs_update` get a light warning background. Cancelled rows are muted.
-4. Pagination stays keyset (`cursor`). Render "First page" and "Next page" as `Button` links (`variant="outline"`, `size="sm"`) in a footer bar. No total count (keyset pagination doesn't produce one cheaply; say so in the README).
-5. Empty state: "No consultations yet."
-
-Stretch (only if time allows, and only with a matching service and schema change plus tests): a status filter as a `ToggleGroup` (All, Upcoming, Past not marked, Completed, Cancelled) stored in the URL as `?status=`, combined with the cursor.
+4. Status tabs above the table: **Upcoming** (default), **Needs update**, **Completed**, **Cancelled**, each with its count. They are links (`/admin?group=…`, the current one `aria-current="page"`), not client-side tabs, so the URL is shareable and the back button works. Groups and their order are the student dashboard's: Upcoming soonest first, the others most recent first.
+5. Pagination is keyset (`cursor`) within the current tab. Render "First page" and "Next page" as `Button` links (`variant="outline"`, `size="sm"`) in a footer bar. Changing tab starts at its first page.
+6. Empty state: "No consultations in this list."
 
 Acceptance criteria:
 
 - [ ] The Chemistry booking shows "Past, not marked" with a highlighted row.
 - [ ] Page 2 via `cursor` still works and invalid cursors still show the existing message.
+- [ ] `/admin` opens on Upcoming; each tab shows its count, and the Chemistry booking is under Needs update.
+
+### 6.6 Booking details dialog
+
+Opened by clicking a row's reason, on the dashboard and in the admin table. A `Dialog`:
+
+1. Title "Consultation details".
+2. The full reason, wrapping, with line breaks kept.
+3. When: `ConsultationTime`. Status: `StatusBadge`.
+4. Admin only: the student's name as entered and the account email.
+5. Footer, student only: the row's actions with the same emphasis (§4). Reschedule and Cancel close this dialog and open theirs; Mark complete and Mark incomplete run in place and close it on success. Focus returns to the reason button afterwards. The admin dialog has only a "Close" button.
+
+Acceptance criteria:
+
+- [ ] A 1000-character reason shows two lines in the row and in full in the dialog.
+- [ ] Tab to a reason, press Enter: the dialog opens; Escape returns focus to the reason.
 
 ## 7. Build order for Claude Code
 

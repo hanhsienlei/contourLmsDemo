@@ -12,7 +12,7 @@ export function ConsultationTime({ iso, note }: { iso: string; note?: string }) 
   const mounted = useMounted()
   return (
     <div className="grid">
-      <time dateTime={iso} className="font-medium">
+      <time dateTime={iso} className="text-sm">
         {mounted ? formatSlot(iso) : ' '}
       </time>
       <span className="text-sm text-muted-foreground">

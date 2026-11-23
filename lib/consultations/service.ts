@@ -8,7 +8,7 @@ import {
   isWithinBusinessHours,
   type ConsultationStatus,
 } from './rules'
-import { encodeCursor, type CreateConsultationInput, type Cursor, type StudentGroup } from './schema'
+import { STUDENT_GROUPS, encodeCursor, type CreateConsultationInput, type Cursor, type StudentGroup } from './schema'
 import type { AdminConsultation, Consultation, Page, StudentName } from './types'
 
 export type { AdminConsultation, Consultation, Page, StudentName } from './types'
@@ -63,7 +63,7 @@ export async function getProfileName(userId: string): Promise<StudentName> {
  * Keyset condition for the rows after `cursor` in (scheduled_at, id) order.
  * Safe to interpolate: both values are re-serialised from strictly validated data
  * (ISO datetime via Date#toISOString, uuid validated by z.uuid()), never raw input
- * (spec 8a, rule 1). This is the only .or() filter in the codebase.
+ * (spec 8a, rule 1). This is the only .or() filter in the codebase; every list uses it.
  */
 function afterCursor(cursor: Cursor, newestFirst: boolean): string {
   const iso = new Date(cursor.scheduledAt).toISOString()
@@ -78,50 +78,78 @@ function nextCursorOf(rows: { scheduled_at: string; id: string }[], limit: numbe
     : null
 }
 
+type Filterable<Q> = { eq(c: string, v: string): Q; gte(c: string, v: string): Q; lt(c: string, v: string): Q }
+
 /**
- * One page of one dashboard section. The groups match displayState in display.ts:
- * scheduled splits at `now` into upcoming (soonest first) and needs_update; completed
- * and cancelled ignore the time. Every group except upcoming is most recent first.
- * `total` counts the whole group, for the section's badge.
+ * Narrows a query to one group, for one student or (no userId) everyone. The groups match
+ * displayState in display.ts: scheduled splits at `now` into upcoming and needs_update;
+ * completed and cancelled ignore the time. Pages and counts both use it, so they agree.
  */
+function inGroup<Q extends Filterable<Q>>(query: Q, group: StudentGroup, now: Date, userId?: string): Q {
+  const scoped = userId ? query.eq('user_id', userId) : query
+  const nowIso = now.toISOString()
+  if (group === 'upcoming') return scoped.eq('status', 'scheduled').gte('scheduled_at', nowIso)
+  if (group === 'needs_update') return scoped.eq('status', 'scheduled').lt('scheduled_at', nowIso)
+  return scoped.eq('status', group)
+}
+
+/** Upcoming is soonest first; every other group is most recent first. */
+const newestFirst = (group: StudentGroup) => group !== 'upcoming'
+
+async function countGroup(group: StudentGroup, now: Date, userId?: string): Promise<number> {
+  const query = createAdminClient().from('consultations').select('id', { count: 'exact', head: true })
+  const { count, error } = await inGroup(query, group, now, userId)
+  if (error) throw mapDbError(error)
+  return count ?? 0
+}
+
+/** How many bookings are in each group, for one student or everyone: the tab and section counts. */
+export async function countGroups(
+  scope: { userId?: string },
+  now: Date = new Date(),
+): Promise<Record<StudentGroup, number>> {
+  const counts = await Promise.all(STUDENT_GROUPS.map((g) => countGroup(g, now, scope.userId)))
+  return Object.fromEntries(STUDENT_GROUPS.map((g, i) => [g, counts[i]])) as Record<StudentGroup, number>
+}
+
+/** One page of one dashboard section, with `total` for the whole section. */
 export async function listOwnGroup(
   userId: string,
   q: { group: StudentGroup; cursor?: Cursor; limit: number },
   now: Date = new Date(),
 ): Promise<Page<Consultation>> {
-  const db = createAdminClient()
-  const nowIso = now.toISOString()
-  const newestFirst = q.group !== 'upcoming'
-
-  // Applied to both the page and the count, so they always agree on the group.
-  const inGroup = <
-    Q extends { eq(c: string, v: string): Q; gte(c: string, v: string): Q; lt(c: string, v: string): Q },
-  >(
-    query: Q,
-  ): Q => {
-    const own = query.eq('user_id', userId)
-    if (q.group === 'upcoming') return own.eq('status', 'scheduled').gte('scheduled_at', nowIso)
-    if (q.group === 'needs_update') return own.eq('status', 'scheduled').lt('scheduled_at', nowIso)
-    return own.eq('status', q.group)
-  }
-
-  let page = inGroup(db.from('consultations').select(COLUMNS))
-    .order('scheduled_at', { ascending: !newestFirst })
-    .order('id', { ascending: !newestFirst })
+  const desc = newestFirst(q.group)
+  let page = inGroup(createAdminClient().from('consultations').select(COLUMNS), q.group, now, userId)
+    .order('scheduled_at', { ascending: !desc })
+    .order('id', { ascending: !desc })
     .limit(q.limit + 1)
-  if (q.cursor) page = page.or(afterCursor(q.cursor, newestFirst))
+  if (q.cursor) page = page.or(afterCursor(q.cursor, desc))
 
-  const [rows, count] = await Promise.all([
-    page,
-    inGroup(db.from('consultations').select('id', { count: 'exact', head: true })),
-  ])
+  const [rows, total] = await Promise.all([page, countGroup(q.group, now, userId)])
   if (rows.error) throw mapDbError(rows.error)
-  if (count.error) throw mapDbError(count.error)
+  const data = rows.data ?? []
+  return { items: data.slice(0, q.limit).map(toConsultation), nextCursor: nextCursorOf(data, q.limit), total }
+}
+
+/** One page of one group across all students (the admin tabs), with the account email and the group total. */
+export async function listAllGroup(
+  q: { group: StudentGroup; cursor?: Cursor; limit: number },
+  now: Date = new Date(),
+): Promise<Page<AdminConsultation>> {
+  const desc = newestFirst(q.group)
+  let page = inGroup(createAdminClient().from('consultations').select(`${COLUMNS}, profiles(email)`), q.group, now)
+    .order('scheduled_at', { ascending: !desc })
+    .order('id', { ascending: !desc })
+    .limit(q.limit + 1)
+  if (q.cursor) page = page.or(afterCursor(q.cursor, desc))
+
+  const [rows, total] = await Promise.all([page, countGroup(q.group, now)])
+  if (rows.error) throw mapDbError(rows.error)
   const data = rows.data ?? []
   return {
-    items: data.slice(0, q.limit).map(toConsultation),
+    items: data.slice(0, q.limit).map((row) => ({ ...toConsultation(row), email: row.profiles?.email ?? '' })),
     nextCursor: nextCursorOf(data, q.limit),
-    total: count.count ?? 0,
+    total,
   }
 }
 

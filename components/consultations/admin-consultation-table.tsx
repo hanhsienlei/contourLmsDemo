@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { displayState, type DisplayState } from '@/lib/consultations/display'
 import type { AdminConsultation } from '@/lib/consultations/types'
+import { AdminReason } from './admin-reason'
 import { ConsultationTime } from './consultation-time'
 import { StatusBadge } from './status-badge'
 
@@ -26,7 +27,7 @@ export function AdminConsultationTable({ items, now }: { items: AdminConsultatio
         {items.length === 0 && (
           <TableRow>
             <TableCell colSpan={4} className="text-center text-muted-foreground">
-              No consultations yet.
+              No consultations in this list.
             </TableCell>
           </TableRow>
         )}
@@ -45,8 +46,8 @@ export function AdminConsultationTable({ items, now }: { items: AdminConsultatio
                   <span className="text-sm text-muted-foreground">{item.email}</span>
                 </div>
               </TableCell>
-              <TableCell className="max-w-64 truncate" title={item.reason}>
-                {item.reason}
+              <TableCell className="max-w-64 whitespace-normal">
+                <AdminReason item={item} state={state} />
               </TableCell>
               <TableCell>
                 <StatusBadge state={state} />

@@ -79,16 +79,16 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 214 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 236 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
 ### Features
 
 - Sign up (first name, last name, email, password), log in and log out with Supabase Auth (from the `with-supabase` template). The name is saved to the account's profile.
-- `/dashboard` (student): your consultations, grouped by display state: Needs your update, Upcoming and History. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation. Cancelled rows are muted, have no actions and sit behind "Show cancelled (n)" in History. Each section shows 20 rows at a time with its own First page and Next page links, and the badges count the whole section. A "Book a consultation" button opens the booking dialog.
+- `/dashboard` (student): your consultations, grouped by display state: Needs your update, Upcoming and History. Each row's title is its reason (up to two lines); clicking it opens a details dialog with the full reason and the row's actions. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation, with one filled button for the likely next step. Cancelled rows are muted, have no actions and sit behind "Show cancelled (n)" in History. Each section shows 20 rows at a time with its own First page and Next page links, and the badges count the whole section. A "Book a consultation" button opens the booking dialog.
 - Booking dialog (student): first name, last name, reason and a day plus a grid of 15-minute slots. The name is pre-filled from the profile and can be edited for that booking. The slots are limited to the booking window. The reschedule dialog is the same component in a second mode. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog.
-- `/admin` (admin): read-only table of all consultations, including cancelled ones, with the student's name, the account email and a display-state badge. Keyset paginated, 20 per page, with First page and Next page buttons. There is no total count, because keyset pagination doesn't produce one cheaply.
+- `/admin` (admin): read-only table of all consultations with the student's name, the account email and a display-state badge. Status tabs (Upcoming by default, Needs update, Completed, Cancelled) show a count each and are links (`/admin?group=…`). Each tab is keyset paginated, 20 per page, with First page and Next page buttons. Clicking a reason opens a read-only details dialog with the full text.
 - `/` redirects by role: admins to `/admin`, students to `/dashboard`. A user with no role row goes to `/no-access`.
 
 ### UI decisions
@@ -101,6 +101,7 @@ The full list is in `docs/superpowers/specs/2026-11-22-ui-ux-refresh.md`.
 - D4: there is no per-student booking cap, in the UI or the API.
 - D5: times show in the browser's time zone, with an explicit label such as "Times in Adelaide time (ACDT)".
 - D6: booking and rescheduling share one dialog component with two modes.
+- Readability round (spec §4, §6.5, §6.6): the reason is the only bold text in a row; at most one filled button per row (Reschedule before the booking, Mark complete after it; Mark incomplete and an upcoming Cancel are quiet ghost buttons). The full reason lives in a details dialog instead of a hover tooltip, which touch and keyboard users can't reach. In that dialog Cancel reads "Cancel booking", because a bare "Cancel" in a dialog footer means "close".
 
 ### Architecture
 
@@ -146,7 +147,7 @@ All routes return JSON. Errors are `{ "error": { "code", "message" } }`.
 | `POST /api/consultations` | student | book `{ firstName, lastName, reason, scheduledAt }` |
 | `PATCH /api/consultations/[id]` | student | exactly one of `{ scheduledAt }` (reschedule) or `{ completed: boolean }` (toggle) |
 | `POST /api/consultations/[id]/cancel` | student | cancel (no body) |
-| `GET /api/admin/consultations?cursor=&limit=` | admin | list all with account email; keyset paginated by `(scheduled_at, id)`, `limit` 1 to 100, default 20 |
+| `GET /api/admin/consultations?group=&cursor=&limit=` | admin | with `group` (same values as the student list): one page of that group across all students, with account email, as `{ items, nextCursor, total }`. Without `group`: every booking, soonest first, as `{ items, nextCursor }`. Keyset paginated by `(scheduled_at, id)`, `limit` 1 to 100, default 20 |
 
 | Status | When |
 |---|---|
@@ -352,12 +353,12 @@ Known minor gaps:
 Nothing in the planned scope was cut. Admin pagination is built. Next steps:
 
 - Give the slot picker the server's clock and refresh its slots every minute, so a wrong browser clock or a dialog left open can't offer a slot the API rejects (see "Booking window and business hours").
-- Make the admin list open on upcoming bookings. It sorts from the oldest booking ever and has only First page and Next page, so as data grows page 1 is old history. Fix: default to `scheduled_at >= now`, with a separate "Past" view and Previous page.
+- A Previous page link. Keyset pages only go forward today (First page and Next page).
+- The tab and section counts are exact `count(*)` queries, cheap at this size. At a large scale, use estimated counts or cache them.
 - Decide whether a student may mark a booking complete before its time. It is allowed today (see Assumptions). If not, the service would reject `completed` while `scheduled_at` is in the future.
 - Put the role in the JWT with a custom access token hook, to drop the per-request role lookup (and accept the staleness trade-off).
 - Add RLS read policies back as a second layer of protection under the service, with pgTAP tests for them.
 - Keep `profiles.email` in sync when a user changes their email.
-- A booking details view (a dialog from the dashboard row and the admin table) that shows the full reason. Both lists cut the reason to one line, and the full text is only in a hover tooltip, which touch and keyboard users can't reach.
 - Let a student edit the reason on an upcoming booking, as a third `{ reason }` body on `PATCH /api/consultations/[id]`.
 - A profile page where a student can change their saved name. Today it is set once at sign-up.
 - API rate limiting (for example Upstash).

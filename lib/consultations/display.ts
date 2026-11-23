@@ -142,6 +142,31 @@ export function actionsFor(state: DisplayState): { visible: RowAction[]; menu: R
   }
 }
 
+export type ActionVariant = 'default' | 'outline' | 'ghost'
+
+/**
+ * Button style of a row action (spec §4). At most one filled ('default') action per row: what the
+ * student most likely wants next. Reschedule before the booking, Mark complete after it.
+ */
+export function actionVariant(state: DisplayState, action: RowAction): ActionVariant {
+  if (state === 'upcoming' && action === 'reschedule') return 'default'
+  if (state === 'needs_update' && action === 'complete') return 'default'
+  if (state === 'upcoming' && action === 'cancel') return 'ghost'
+  if (action === 'incomplete') return 'ghost'
+  return 'outline'
+}
+
+/** Actions in the details dialog's footer (spec §6.6): all of the row's, including the ⋯ menu's. */
+export function detailsActions(state: DisplayState): RowAction[] {
+  const { visible, menu } = actionsFor(state)
+  return [...visible, ...menu]
+}
+
+/** Label of an action in the details dialog. A bare "Cancel" in a dialog footer reads as "close the dialog". */
+export function detailsActionLabel(action: RowAction): string {
+  return action === 'cancel' ? 'Cancel booking' : ROW_ACTION_LABEL[action]
+}
+
 /** Actions that open a dialog (the others run inline). */
 export type DialogAction = Extract<RowAction, 'reschedule' | 'cancel'>
 const isDialogAction = (a: RowAction): a is DialogAction => a === 'reschedule' || a === 'cancel'
@@ -164,6 +189,23 @@ export function rowLayout(state: DisplayState): RowLayout {
   const menuOnly = menu.filter(isDialogAction)
   const menuVisibility = menuOnly.length > 0 ? 'always' : dialogSecondary.length > 0 ? 'below-sm' : 'never'
   return { primary, secondary: dialogSecondary, menuOnly, menuVisibility }
+}
+
+/** Admin status tabs (spec §6.5), in display order. Upcoming is the default. */
+export const ADMIN_TABS: readonly { group: DisplayState; label: string }[] = [
+  { group: 'upcoming', label: 'Upcoming' },
+  { group: 'needs_update', label: 'Needs update' },
+  { group: 'completed', label: 'Completed' },
+  { group: 'cancelled', label: 'Cancelled' },
+]
+
+/** Admin link to one page of one tab (null cursor: its first page). The default tab stays out of the URL. */
+export function adminPageHref(group: DisplayState, cursor: string | null): string {
+  const params = new URLSearchParams()
+  if (group !== 'upcoming') params.set('group', group)
+  if (cursor) params.set('cursor', cursor)
+  const query = params.toString()
+  return query ? `/admin?${query}` : '/admin'
 }
 
 /**

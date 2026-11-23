@@ -5,8 +5,9 @@ import { TimeZoneNote } from '@/components/consultations/time-zone-note'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { requireRolePage } from '@/lib/auth/guards'
+import { ADMIN_TABS, adminPageHref } from '@/lib/consultations/display'
 import { parseAdminListQuery } from '@/lib/consultations/schema'
-import { listAll } from '@/lib/consultations/service'
+import { countGroups, listAllGroup } from '@/lib/consultations/service'
 
 const PAGE_SIZE = 20
 
@@ -27,7 +28,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   await requireRolePage('admin')
 
   const sp = await searchParams
-  const q = parseAdminListQuery({ cursor: sp.cursor, limit: PAGE_SIZE })
+  const q = parseAdminListQuery({ group: sp.group, cursor: sp.cursor, limit: PAGE_SIZE })
   if (!q) {
     return (
       <div className="grid gap-6">
@@ -37,9 +38,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     )
   }
 
-  const { items, nextCursor } = await listAll(q)
-  // Rendered once per request, so the current time is stable.
+  const group = q.group ?? 'upcoming'
+  // One clock for the tab, its counts and the rows' display state.
   const now = new Date()
+  const [{ items, nextCursor }, counts] = await Promise.all([
+    listAllGroup({ group, cursor: q.cursor, limit: q.limit }, now),
+    countGroups({}, now),
+  ])
 
   return (
     <div className="grid gap-6">
@@ -54,17 +59,33 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </div>
         <TimeZoneNote />
       </header>
+      <nav aria-label="Consultation status" className="flex flex-wrap gap-2 border-b pb-3">
+        {ADMIN_TABS.map((tab) => {
+          const current = tab.group === group
+          return (
+            <Button key={tab.group} asChild variant={current ? 'secondary' : 'ghost'} size="sm">
+              <Link href={adminPageHref(tab.group, null)} aria-current={current ? 'page' : undefined}>
+                {tab.label}{' '}
+                <Badge variant={current ? 'default' : 'outline'}>
+                  {counts[tab.group]}
+                  <span className="sr-only"> bookings</span>
+                </Badge>
+              </Link>
+            </Button>
+          )
+        })}
+      </nav>
       <AdminConsultationTable items={items} now={now} />
       {(q.cursor || nextCursor) && (
         <nav aria-label="Pagination" className="flex gap-2">
           {q.cursor && (
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin">First page</Link>
+              <Link href={adminPageHref(group, null)}>First page</Link>
             </Button>
           )}
           {nextCursor && (
             <Button asChild variant="outline" size="sm">
-              <Link href={`/admin?cursor=${encodeURIComponent(nextCursor)}`}>Next page</Link>
+              <Link href={adminPageHref(group, nextCursor)}>Next page</Link>
             </Button>
           )}
         </nav>

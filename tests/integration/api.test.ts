@@ -209,6 +209,19 @@ describe('admin list', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject(errShape)
   })
+  it('admin GET with a group -> one page of it with a total', async () => {
+    session.current = ADMIN
+    const res = await adminGet(req('GET', '/api/admin/consultations?group=upcoming&limit=1'))
+    expect(res.status).toBe(200)
+    const j = await res.json()
+    expect(j.items.length).toBeLessThanOrEqual(1)
+    expect(typeof j.total).toBe('number')
+  })
+  it('admin GET with an unknown group -> 400', async () => {
+    session.current = ADMIN
+    const res = await adminGet(req('GET', '/api/admin/consultations?group=all'))
+    expect(res.status).toBe(400)
+  })
   it('cursor=garbage -> 400', async () => {
     session.current = ADMIN
     const res = await adminGet(req('GET', '/api/admin/consultations?cursor=garbage'))
