@@ -1,15 +1,23 @@
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
-import { AdminConsultationTable } from '@/components/consultations/admin-consultation-table'
+import {
+  adminReasonColumn,
+  statusColumn,
+  studentColumn,
+  timeColumn,
+} from '@/components/consultations/consultation-columns'
+import { ConsultationTable } from '@/components/consultations/consultation-table'
+import { ListPager, ListTabs } from '@/components/consultations/list-nav'
 import { TimeZoneNote } from '@/components/consultations/time-zone-note'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { requireRolePage } from '@/lib/auth/guards'
-import { ADMIN_TABS, adminPageHref } from '@/lib/consultations/display'
 import { parseAdminListQuery } from '@/lib/consultations/schema'
 import { countGroups, listAllGroup } from '@/lib/consultations/service'
 
 const PAGE_SIZE = 20
+
+/** Read-only: no actions column. */
+const COLUMNS = [timeColumn, studentColumn, adminReasonColumn, statusColumn]
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
@@ -59,37 +67,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </div>
         <TimeZoneNote />
       </header>
-      <nav aria-label="Consultation status" className="flex flex-wrap gap-2 border-b pb-3">
-        {ADMIN_TABS.map((tab) => {
-          const current = tab.group === group
-          return (
-            <Button key={tab.group} asChild variant={current ? 'secondary' : 'ghost'} size="sm">
-              <Link href={adminPageHref(tab.group, null)} aria-current={current ? 'page' : undefined}>
-                {tab.label}{' '}
-                <Badge variant={current ? 'default' : 'outline'}>
-                  {counts[tab.group]}
-                  <span className="sr-only"> bookings</span>
-                </Badge>
-              </Link>
-            </Button>
-          )
-        })}
-      </nav>
-      <AdminConsultationTable items={items} now={now} />
-      {(q.cursor || nextCursor) && (
-        <nav aria-label="Pagination" className="flex gap-2">
-          {q.cursor && (
-            <Button asChild variant="outline" size="sm">
-              <Link href={adminPageHref(group, null)}>First page</Link>
-            </Button>
-          )}
-          {nextCursor && (
-            <Button asChild variant="outline" size="sm">
-              <Link href={adminPageHref(group, nextCursor)}>Next page</Link>
-            </Button>
-          )}
-        </nav>
-      )}
+      <ListTabs base="/admin" current={group} counts={counts} />
+      <ConsultationTable items={items} now={now} columns={COLUMNS} caption="All consultations" />
+      <ListPager base="/admin" group={group} onLaterPage={!!q.cursor} nextCursor={nextCursor} />
     </div>
   )
 }

@@ -4,6 +4,7 @@ Date: 2026-11-22
 Status: approved by Hanna, ready to build
 Amends: `2026-11-22-mini-lms-design.md` §10 (UI) and the "Upcoming vs past" call in §17. Everything else in that spec still holds. When this file and §10 disagree, this file wins.
 Revised: 2026-11-23 (readability round): action emphasis (§4), row anatomy and the details dialog (§6.1, §6.6), and admin status tabs (§6.5). The admin tabs add an optional `group` parameter to the admin API, as the §6.5 stretch allows; without it the API answers as before.
+Revised: 2026-11-23 (shared table): the student dashboard uses the admin list's layout, status tabs over a table (D2, §6.1, §6.7). Both views share one table shell and its columns; each page picks its columns, so the actions show only where a page passes the actions column.
 
 ## 1. Purpose
 
@@ -14,7 +15,7 @@ Make the three student surfaces and the admin list consistent, clearer about sta
 | # | Decision | Why |
 |---|---|---|
 | D1 | A past `scheduled` booking keeps its API rule (it can still be cancelled). In the UI, its main actions are Mark complete and Reschedule; Cancel moves into a "More" (⋯) menu. | The UI never contradicts the API. It only changes emphasis. |
-| D2 | The student dashboard groups by **display state**, not by date alone: Needs your update, Upcoming, History. | A student's first question is "what do I need to do", and state answers it. |
+| D2 | The student dashboard groups by **display state**, not by date alone, with the admin list's **status tabs over a table** (Upcoming, Needs update, Completed, Cancelled). The Needs update tab carries a warning icon while it has rows. | A student's first question is "what do I need to do", and state answers it. One layout for both views is one thing to maintain (§6.7). |
 | D3 | Booking opens in a **Dialog** from the dashboard. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog, so the old link still works. | The form is short and launched from the list. The student keeps context and sees the new booking land. |
 | D4 | **No per-student booking cap.** Nothing in the UI mentions one. | Matches the API and README. Rate limiting stays under "with more time". |
 | D5 | Both views show times in the **browser's time zone with an explicit label** (for example "Times in Adelaide time (ACDT)"). | Keeps today's `LocalTime` behaviour, removes the vague "your local time". |
@@ -70,28 +71,26 @@ Emphasis: each row has at most one filled button, the thing the student most lik
 
 ### 6.1 Student dashboard (`/dashboard`)
 
-Layout, top to bottom:
+The same layout as the admin list (§6.5), from the shared pieces in §6.7.
 
 1. Header row: `h1` "Your consultations", then `TimeZoneNote` under it; "Book a consultation" primary button on the right (opens the dialog).
-2. **Needs your update** (rendered only when non-empty): section heading with an alert icon in warning colour. Rows are `needs_update`, most recent first. Each row's second line ends with "Did this happen?".
-3. **Upcoming** with a count badge: `upcoming` rows, soonest first. Empty state: "Nothing booked yet" plus a "Book a consultation" button.
-4. **History**: `completed` rows, most recent first. Then a ghost toggle "Show cancelled (n)", collapsed by default, revealing `cancelled` rows, most recent first. Section hidden when both lists are empty.
-
-Row anatomy (all sections):
-
-- Title: the **reason**, semibold, up to **two lines** then "…". It is a button that opens the details dialog (§6.6), which shows the full text. No `title` tooltip: touch and keyboard users can't reach one. The first and last name are **not** shown on the student's own rows.
-- Second line: `ConsultationTime` (absolute plus relative).
-- Right side: `StatusBadge`, then the actions from §4.
-- Cancelled rows: muted background and text, no actions.
-
-Whole-page empty state (no consultations at all): centred card, "Book your first consultation", one line explaining what a consultation is, primary button.
+2. Status tabs: **Upcoming** (default), **Needs update**, **Completed**, **Cancelled**, each with its count, as links (`/dashboard?group=…`, the current one `aria-current="page"`). The Needs update tab shows a warning-coloured alert icon while its count is above zero. Upcoming is soonest first, the others most recent first.
+3. Table columns:
+   - **Time:** `ConsultationTime`. On `needs_update` rows the second line ends with "Did this happen?".
+   - **Reason:** up to two lines, a button that opens the details dialog (§6.6) with the row's actions in its footer.
+   - **Status:** `StatusBadge`.
+   - **Actions:** the row actions from §4, with the same emphasis and the same ⋯ menu rules. Cancelled rows have none.
+   The first and last name are **not** shown: every row is the student's own.
+4. Rows with `needs_update` get a light warning background. Cancelled rows are muted.
+5. Pagination: keyset (`cursor`) within the current tab, "First page" and "Next page" as in §6.5. Changing tab starts at its first page.
+6. Empty tab: "No consultations in this list." Whole-page empty state (no consultations at all): centred card, "Book your first consultation", one line explaining what a consultation is, primary button.
 
 Acceptance criteria:
 
-- [ ] Seeded Alice shows: Needs your update (Chemistry), Upcoming (Methods, English), History (Specialist Maths, Term 3 study plan) and "Show cancelled (1)".
-- [ ] No row shows "Alice Nguyen:".
+- [ ] Seeded Alice opens on Upcoming (Methods, Specialist Maths, English); Needs update (1, with the alert icon) holds Chemistry; Completed holds the Term 3 study plan; Cancelled holds Physics projectile motion.
+- [ ] No row shows "Alice Nguyen".
 - [ ] The Chemistry row shows Mark complete and Reschedule; Cancel is reachable from ⋯ and still works.
-- [ ] Marking Methods complete moves it to History after refresh, with toast "Marked complete".
+- [ ] Marking Methods complete moves it to the Completed tab, with toast "Marked complete".
 - [ ] Every row's state is readable with colours disabled.
 
 ### 6.2 Book dialog (mode `book`)
@@ -177,6 +176,17 @@ Acceptance criteria:
 
 - [ ] A 1000-character reason shows two lines in the row and in full in the dialog.
 - [ ] Tab to a reason, press Enter: the dialog opens; Escape returns focus to the reason.
+
+### 6.7 Shared list pieces
+
+The dashboard and the admin list are one layout with different columns. Sharing happens at the level of pieces, not one component that knows about roles:
+
+- `ConsultationTable` (server): the table shell. It takes the rows, `now`, a caption and a list of **columns**, and applies the row backgrounds from item 4 of §6.1 and §6.5. It has no role or viewer prop.
+- Columns (`consultation-columns.tsx`): `timeColumn`, `studentColumn`, `adminReasonColumn`, `studentReasonColumn`, `statusColumn`, `actionsColumn`. Each page lists the columns it wants: the admin page has no actions column, the dashboard has no student column. Showing or hiding the actions is that choice, nothing else.
+- `ListTabs` and `ListPager` (server): the status tabs and the First page / Next page bar, given the page's base path.
+- Which actions a row has, their emphasis and the ⋯ menu layout stay in `display.ts` (`actionsFor`, `actionVariant`, `rowLayout`).
+
+Hiding a control is presentation only. The API guards and the service decide what a user may do.
 
 ## 7. Build order for Claude Code
 

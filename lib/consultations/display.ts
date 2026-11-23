@@ -1,5 +1,5 @@
 import { format, formatDistanceStrict } from 'date-fns'
-import { STUDENT_GROUPS, type StudentGroup } from './schema'
+import type { StudentGroup } from './schema'
 import type { Consultation } from './types'
 
 /**
@@ -191,37 +191,31 @@ export function rowLayout(state: DisplayState): RowLayout {
   return { primary, secondary: dialogSecondary, menuOnly, menuVisibility }
 }
 
-/** Admin status tabs (spec §6.5), in display order. Upcoming is the default. */
-export const ADMIN_TABS: readonly { group: DisplayState; label: string }[] = [
+/** Status tabs of the dashboard and the admin list (spec §6.1, §6.5), in display order. Upcoming is the default. */
+export const LIST_TABS: readonly { group: DisplayState; label: string }[] = [
   { group: 'upcoming', label: 'Upcoming' },
   { group: 'needs_update', label: 'Needs update' },
   { group: 'completed', label: 'Completed' },
   { group: 'cancelled', label: 'Cancelled' },
 ]
 
-/** Admin link to one page of one tab (null cursor: its first page). The default tab stays out of the URL. */
-export function adminPageHref(group: DisplayState, cursor: string | null): string {
+export type ListPath = '/admin' | '/dashboard'
+
+/** Link to one page of one tab (null cursor: its first page). The default tab stays out of the URL. */
+export function listPageHref(base: ListPath, group: DisplayState, cursor: string | null): string {
   const params = new URLSearchParams()
   if (group !== 'upcoming') params.set('group', group)
   if (cursor) params.set('cursor', cursor)
   const query = params.toString()
-  return query ? `/admin?${query}` : '/admin'
+  return query ? `${base}?${query}` : base
 }
 
-/**
- * Dashboard link to one page of one section (null: its first page). Other sections keep
- * the page they are on; anything else in the query (such as `book=1`) is dropped.
- */
-export function sectionPageHref(
-  current: Readonly<Record<string, string | string[] | undefined>>,
-  section: DisplayState,
-  cursor: string | null,
-): string {
-  const params = new URLSearchParams()
-  for (const group of STUDENT_GROUPS) {
-    const value = group === section ? cursor : current[group]
-    if (typeof value === 'string' && value) params.set(group, value)
-  }
-  const query = params.toString()
-  return query ? `/dashboard?${query}` : '/dashboard'
+/** Ends a row's time line: past, unmarked bookings ask the student to update them. */
+export function timeNote(state: DisplayState): string | undefined {
+  return state === 'needs_update' ? 'Did this happen?' : undefined
+}
+
+/** Whether a tab shows the warning icon: Needs update, while it has rows. */
+export function tabNeedsAttention(group: DisplayState, count: number): boolean {
+  return group === 'needs_update' && count > 0
 }
