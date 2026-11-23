@@ -45,9 +45,14 @@ export const studentReasonColumn = (occupied: number[]): Column<Consultation> =>
   cell: (item, state) => <StudentReason item={item} state={state} occupied={occupied} />,
 })
 
+/**
+ * Hidden below `sm`: every row in a tab shares one status and the current tab names it, so on a
+ * phone the room goes to the reason and the actions (spec §6.7).
+ */
 export const statusColumn: Column<Consultation> = {
   id: 'status',
   header: 'Status',
+  className: 'hidden sm:table-cell',
   cell: (_item, state) => <StatusBadge state={state} />,
 }
 

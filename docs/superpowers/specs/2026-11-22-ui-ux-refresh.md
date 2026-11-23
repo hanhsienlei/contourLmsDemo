@@ -76,7 +76,7 @@ The same layout as the admin list (§6.5), from the shared pieces in §6.7.
 1. Header row: `h1` "Your consultations", then `TimeZoneNote` under it; "Book a consultation" primary button on the right (opens the dialog).
 2. Status tabs: **Upcoming** (default), **Needs update**, **Completed**, **Cancelled**, each with its count, as links (`/dashboard?group=…`, the current one `aria-current="page"`). The Needs update tab shows a warning-coloured alert icon while its count is above zero. Upcoming is soonest first, the others most recent first.
 3. Table columns:
-   - **Time:** `ConsultationTime`. On `needs_update` rows the second line ends with "Did this happen?".
+   - **Time:** `ConsultationTime`. On `needs_update` rows the second line ends with "Did this happen?" (below `sm`, on a line of its own, so the time column stays narrow).
    - **Reason:** up to two lines, a button that opens the details dialog (§6.6) with the row's actions in its footer.
    - **Status:** `StatusBadge`.
    - **Actions:** the row actions from §4, with the same emphasis and the same ⋯ menu rules. Cancelled rows have none.
@@ -184,6 +184,7 @@ The dashboard and the admin list are one layout with different columns. Sharing 
 - `ConsultationTable` (server): the table shell. It takes the rows, `now`, a caption and a list of **columns**, and applies the row backgrounds from item 4 of §6.1 and §6.5. It has no role or viewer prop.
 - Columns (`consultation-columns.tsx`): `timeColumn`, `studentColumn`, `adminReasonColumn`, `studentReasonColumn`, `statusColumn`, `actionsColumn`. Each page lists the columns it wants: the admin page has no actions column, the dashboard has no student column. Showing or hiding the actions is that choice, nothing else.
 - `ListTabs` and `ListPager` (server): the status tabs and the First page / Next page bar, given the page's base path.
+- Below `sm` the status column is hidden, in both views. Every row in a tab has the same status and the current tab names it in text, so rule 3 of §3 still holds; the width goes to the reason and the row actions, which must stay on screen without scrolling sideways.
 - Which actions a row has, their emphasis and the ⋯ menu layout stay in `display.ts` (`actionsFor`, `actionVariant`, `rowLayout`).
 
 Hiding a control is presentation only. The API guards and the service decide what a user may do.
