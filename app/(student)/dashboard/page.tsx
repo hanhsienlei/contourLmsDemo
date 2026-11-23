@@ -1,10 +1,18 @@
 import Link from 'next/link'
 import { BookConsultationButton } from '@/components/consultations/book-consultation-button'
+import {
+  actionsColumn,
+  statusColumn,
+  studentReasonColumn,
+  timeColumn,
+} from '@/components/consultations/consultation-columns'
+import { ConsultationTable } from '@/components/consultations/consultation-table'
+import { ListPager, ListTabs } from '@/components/consultations/list-nav'
 import { TimeZoneNote } from '@/components/consultations/time-zone-note'
-import { ConsultationList } from '@/components/consultations/consultation-list'
+import { Card, CardContent } from '@/components/ui/card'
 import { requireRolePage } from '@/lib/auth/guards'
-import { STUDENT_GROUPS, parseStudentListQuery, type StudentGroup } from '@/lib/consultations/schema'
-import { getProfileName, listActiveSlots, listOwnGroup } from '@/lib/consultations/service'
+import { parseStudentListQuery } from '@/lib/consultations/schema'
+import { countGroups, getProfileName, listActiveSlots, listOwnGroup } from '@/lib/consultations/service'
 
 const PAGE_SIZE = 20
 
@@ -14,9 +22,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   const { userId } = await requireRolePage('student')
   const sp = await searchParams
 
-  // Each section pages on its own; its cursor is the query param named after it.
-  const queries = STUDENT_GROUPS.map((group) => parseStudentListQuery({ group, cursor: sp[group], limit: PAGE_SIZE }))
-  if (queries.some((q) => q === null)) {
+  const q = parseStudentListQuery({ group: sp.group ?? 'upcoming', cursor: sp.cursor, limit: PAGE_SIZE })
+  if (!q) {
     return (
       <div role="alert" className="grid gap-2">
         <p>Invalid page link.</p>
@@ -27,17 +34,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
     )
   }
 
-  // One clock for every query and for the rows' display state.
+  // One clock for the tab, its counts and the rows' display state.
   const now = new Date()
-  const [pages, occupied, defaults] = await Promise.all([
-    Promise.all(queries.map((q) => listOwnGroup(userId, q!, now))),
+  const [{ items, nextCursor }, counts, occupied, defaults] = await Promise.all([
+    listOwnGroup(userId, q, now),
+    countGroups({ userId }, now),
     listActiveSlots(userId, now),
     getProfileName(userId),
   ])
-  const groups = Object.fromEntries(STUDENT_GROUPS.map((g, i) => [g, pages[i]])) as Record<
-    StudentGroup,
-    (typeof pages)[number]
-  >
+  const hasAny = Object.values(counts).some((n) => n > 0)
+  // The student's view adds the actions column and leaves out the student column.
+  const columns = [timeColumn, studentReasonColumn(occupied), statusColumn, actionsColumn(occupied)]
 
   return (
     <div className="grid gap-6">
@@ -48,7 +55,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
         <BookConsultationButton openOnLoad={sp.book === '1'} occupied={occupied} defaults={defaults} />
       </div>
-      <ConsultationList groups={groups} searchParams={sp} occupied={occupied} defaults={defaults} />
+      {hasAny ? (
+        <>
+          <ListTabs base="/dashboard" current={q.group} counts={counts} />
+          <ConsultationTable items={items} now={now} columns={columns} caption="Your consultations" />
+          <ListPager base="/dashboard" group={q.group} onLaterPage={!!q.cursor} nextCursor={nextCursor} />
+        </>
+      ) : (
+        <Card>
+          <CardContent className="grid justify-items-center gap-3 p-8 text-center">
+            <h2 className="text-lg font-semibold">Book your first consultation</h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              A consultation is a one-on-one session with a tutor to talk through your study questions.
+            </p>
+            <BookConsultationButton occupied={occupied} defaults={defaults} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

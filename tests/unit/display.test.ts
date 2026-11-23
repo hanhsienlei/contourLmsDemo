@@ -15,11 +15,12 @@ import {
   groupByLocalDay,
   slotButtonState,
   moreActionsAriaLabel,
-  sectionPageHref,
   actionVariant,
   detailsActions,
-  ADMIN_TABS,
-  adminPageHref,
+  LIST_TABS,
+  listPageHref,
+  timeNote,
+  tabNeedsAttention,
   detailsActionLabel,
 } from '@/lib/consultations/display'
 import type { ConsultationStatus } from '@/lib/consultations/rules'
@@ -258,21 +259,6 @@ describe('moreActionsAriaLabel', () => {
   })
 })
 
-describe('sectionPageHref', () => {
-  it("sets one section's cursor and keeps the other sections' pages", () => {
-    expect(sectionPageHref({ completed: 'c1', book: '1' }, 'cancelled', 'x2')).toBe(
-      '/dashboard?completed=c1&cancelled=x2',
-    )
-  })
-  it("drops the section's cursor for its first page", () => {
-    expect(sectionPageHref({ completed: 'c1', cancelled: 'x2' }, 'completed', null)).toBe('/dashboard?cancelled=x2')
-    expect(sectionPageHref({ upcoming: 'u1' }, 'upcoming', null)).toBe('/dashboard')
-  })
-  it('ignores repeated params and encodes cursors', () => {
-    expect(sectionPageHref({ upcoming: ['a', 'b'] }, 'completed', 'a+b/=')).toBe('/dashboard?completed=a%2Bb%2F%3D')
-  })
-})
-
 describe('actionVariant', () => {
   it.each([
     ['upcoming', 'complete', 'outline'],
@@ -303,9 +289,9 @@ describe('detailsActions', () => {
   })
 })
 
-describe('ADMIN_TABS', () => {
+describe('LIST_TABS', () => {
   it('lists every group once, Upcoming first, with its label', () => {
-    expect(ADMIN_TABS).toEqual([
+    expect(LIST_TABS).toEqual([
       { group: 'upcoming', label: 'Upcoming' },
       { group: 'needs_update', label: 'Needs update' },
       { group: 'completed', label: 'Completed' },
@@ -314,14 +300,29 @@ describe('ADMIN_TABS', () => {
   })
 })
 
-describe('adminPageHref', () => {
-  it('leaves the default tab out of the URL', () => {
-    expect(adminPageHref('upcoming', null)).toBe('/admin')
-    expect(adminPageHref('upcoming', 'c1')).toBe('/admin?cursor=c1')
+describe('listPageHref', () => {
+  it.each(['/admin', '/dashboard'] as const)('leaves the default tab out of the URL on %s', (base) => {
+    expect(listPageHref(base, 'upcoming', null)).toBe(base)
+    expect(listPageHref(base, 'upcoming', 'c1')).toBe(`${base}?cursor=c1`)
   })
   it('names other tabs and encodes the cursor', () => {
-    expect(adminPageHref('cancelled', null)).toBe('/admin?group=cancelled')
-    expect(adminPageHref('completed', 'a+b/=')).toBe('/admin?group=completed&cursor=a%2Bb%2F%3D')
+    expect(listPageHref('/admin', 'cancelled', null)).toBe('/admin?group=cancelled')
+    expect(listPageHref('/dashboard', 'completed', 'a+b/=')).toBe('/dashboard?group=completed&cursor=a%2Bb%2F%3D')
+  })
+})
+
+describe('timeNote', () => {
+  it('asks "Did this happen?" only on past, unmarked bookings', () => {
+    expect(timeNote('needs_update')).toBe('Did this happen?')
+    for (const state of ['upcoming', 'completed', 'cancelled'] as const) expect(timeNote(state)).toBeUndefined()
+  })
+})
+
+describe('tabNeedsAttention', () => {
+  it('flags the Needs update tab only while it has rows', () => {
+    expect(tabNeedsAttention('needs_update', 1)).toBe(true)
+    expect(tabNeedsAttention('needs_update', 0)).toBe(false)
+    expect(tabNeedsAttention('upcoming', 5)).toBe(false)
   })
 })
 

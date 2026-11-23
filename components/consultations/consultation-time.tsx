@@ -6,7 +6,8 @@ import { useMounted } from './use-mounted'
 
 /**
  * Absolute slot (the `<time>` element) plus relative time in the browser's timezone; blank until
- * mounted so hydration agrees. `note` ends the second line (e.g. "Did this happen?").
+ * mounted so hydration agrees. `note` ends the second line (e.g. "Did this happen?"), or takes a
+ * third line below `sm`.
  */
 export function ConsultationTime({ iso, note }: { iso: string; note?: string }) {
   const mounted = useMounted()
@@ -19,8 +20,11 @@ export function ConsultationTime({ iso, note }: { iso: string; note?: string }) 
         {mounted ? relativeTime(iso, new Date()) : ' '}
         {mounted && note && (
           <>
-            <span aria-hidden="true"> · </span>
-            {note}
+            {/* Below `sm` the note takes its own line, so it doesn't widen a table's time column. */}
+            <span aria-hidden="true" className="hidden sm:inline">
+              {' · '}
+            </span>
+            <span className="block sm:inline">{note}</span>
           </>
         )}
       </span>

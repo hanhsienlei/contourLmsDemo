@@ -55,6 +55,7 @@ The seed gives Alice a booking in every state (upcoming and past `scheduled`, `c
 
 - `npm run db:seed` deletes and recreates only the demo users and their bookings. The schema is untouched.
 - `npm run db:reset` wipes the database, reapplies the migrations and seeds again.
+- `npm run db:seed:bulk` adds one more student, `sam@demo.local` (Sam Lee, same password), with enough bookings to page every tab: 45 upcoming, 25 needs update, 30 completed and 22 cancelled. It is opt-in and leaves the other demo accounts alone; re-running it replaces Sam's bookings.
 
 You can also sign up with any email. Email confirmation is off locally, so a new account goes straight in as a student.
 
@@ -86,7 +87,7 @@ npm run db:types     # regenerate lib/supabase/database.types.ts from the local 
 ### Features
 
 - Sign up (first name, last name, email, password), log in and log out with Supabase Auth (from the `with-supabase` template). The name is saved to the account's profile.
-- `/dashboard` (student): your consultations, grouped by display state: Needs your update, Upcoming and History. Each row's title is its reason (up to two lines); clicking it opens a details dialog with the full reason and the row's actions. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation, with one filled button for the likely next step. Cancelled rows are muted, have no actions and sit behind "Show cancelled (n)" in History. Each section shows 20 rows at a time with its own First page and Next page links, and the badges count the whole section. A "Book a consultation" button opens the booking dialog.
+- `/dashboard` (student): your consultations in the same layout as the admin list: status tabs (Upcoming by default, Needs update, Completed, Cancelled) with a count each, over a table of Time, Reason, Status and Actions. The tabs are links (`/dashboard?group=…`), and Needs update shows a warning icon while it has rows. Each row has a Mark complete or Mark incomplete button, a Reschedule dialog and a Cancel dialog with confirmation, with one filled button for the likely next step. Clicking a reason opens a details dialog with the full text and the row's actions. Cancelled rows are muted and have no actions. Each tab is keyset paginated, 20 per page. A "Book a consultation" button opens the booking dialog.
 - Booking dialog (student): first name, last name, reason and a day plus a grid of 15-minute slots. The name is pre-filled from the profile and can be edited for that booking. The slots are limited to the booking window. The reschedule dialog is the same component in a second mode. `/consultations/new` redirects to `/dashboard?book=1`, which opens the dialog.
 - `/admin` (admin): read-only table of all consultations with the student's name, the account email and a display-state badge. Status tabs (Upcoming by default, Needs update, Completed, Cancelled) show a count each and are links (`/admin?group=…`). Each tab is keyset paginated, 20 per page, with First page and Next page buttons. Clicking a reason opens a read-only details dialog with the full text.
 - `/` redirects by role: admins to `/admin`, students to `/dashboard`. A user with no role row goes to `/no-access`.
@@ -96,7 +97,7 @@ npm run db:types     # regenerate lib/supabase/database.types.ts from the local 
 The full list is in `docs/superpowers/specs/2026-11-22-ui-ux-refresh.md`.
 
 - D1: a past `scheduled` booking can still be cancelled, as the API allows. In the UI its main actions are Mark complete and Reschedule, and Cancel is in the ⋯ menu. Upcoming bookings keep Cancel visible on desktop.
-- D2: the dashboard groups by display state (Needs your update, Upcoming, History), not by date alone.
+- D2: the dashboard groups by display state, not by date alone, with the admin list's status tabs over a table. Both views share one table shell (`ConsultationTable`) and a set of columns (`consultation-columns.tsx`); each page lists the columns it shows, so the admin page simply has no actions column. Hiding a control is presentation only: the API guards and the service decide what a user may do.
 - D3: booking opens in a dialog from the dashboard. The old `/consultations/new` link redirects to `/dashboard?book=1`.
 - D4: there is no per-student booking cap, in the UI or the API.
 - D5: times show in the browser's time zone, with an explicit label such as "Times in Adelaide time (ACDT)".
@@ -259,7 +260,7 @@ Every student query includes `user_id = <verified user>`, so another student's b
 - "Complete" is the student's own tracking. It can be set at any time, even before the scheduled time, and toggling it doesn't re-check the booking window.
 - A past `scheduled` booking can still be cancelled. Status rules don't depend on time.
 - After booking, only the time (reschedule) and the status (complete, cancel) can change. The reason and the name on a booking can't be edited: the brief asks only for reschedule and cancel. To change them, a student cancels and books again.
-- The dashboard groups by display state. A past `scheduled` booking shows as "Past, not marked" under Needs your update, and a past `completed` one is in History. Display state comes from the status and the time against now.
+- The dashboard groups by display state. A past `scheduled` booking shows as "Past, not marked" in the Needs update tab, and a `completed` one is in the Completed tab. Display state comes from the status and the time against now.
 - The student's name belongs to the account: it is collected at sign-up and stored on `profiles`. Each consultation also keeps the name typed on its booking form, because the brief puts the name on that form. The form is pre-filled from the profile and the student can change it for one booking (for example a preferred name); that doesn't change the profile. The admin list shows the booking's name next to the account email.
 - Profile names are nullable. Admin and seeded staff accounts have none, and a student with no profile name gets an empty booking form to fill in.
 - Admins are staff accounts. They don't book, and they can't change anything. Each user has one role.
