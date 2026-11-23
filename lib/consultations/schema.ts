@@ -36,10 +36,24 @@ export const updateConsultationSchema = z.union([
 ]);
 export type UpdateConsultationInput = z.infer<typeof updateConsultationSchema>;
 
+const pageLimit = z.coerce.number().int().min(1).max(100).default(20);
+
 export const adminListQuerySchema = z
   .object({
     cursor: z.string().optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(20),
+    limit: pageLimit,
+  })
+  .strict();
+
+/** Sections of the student's own list, the same names as the dashboard's display states. */
+export const STUDENT_GROUPS = ['needs_update', 'upcoming', 'completed', 'cancelled'] as const;
+export type StudentGroup = (typeof STUDENT_GROUPS)[number];
+
+export const studentListQuerySchema = z
+  .object({
+    group: z.enum(STUDENT_GROUPS),
+    cursor: z.string().optional(),
+    limit: pageLimit,
   })
   .strict();
 
@@ -67,4 +81,14 @@ export function parseAdminListQuery(raw: unknown): { cursor?: Cursor; limit: num
   if (parsed.data.cursor === undefined) return { cursor: undefined, limit: parsed.data.limit };
   const cursor = decodeCursor(parsed.data.cursor);
   return cursor ? { cursor, limit: parsed.data.limit } : null;
+}
+
+/** Validates the student list query and decodes its cursor. Null means the query or page link is invalid. */
+export function parseStudentListQuery(raw: unknown): { group: StudentGroup; cursor?: Cursor; limit: number } | null {
+  const parsed = studentListQuerySchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const { group, limit } = parsed.data;
+  if (parsed.data.cursor === undefined) return { group, cursor: undefined, limit };
+  const cursor = decodeCursor(parsed.data.cursor);
+  return cursor ? { group, cursor, limit } : null;
 }

@@ -2,14 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   DISPLAY_STATE_LABEL,
   displayState,
-  groupForStudent,
   relativeTime,
   timeZoneLabel,
   slotPeriod,
   groupSlotsByPeriod,
   dayKey,
   initialDay,
-  activeSlotKeys,
   actionsFor,
   rowLayout,
   ROW_ACTION_LABEL,
@@ -17,6 +15,7 @@ import {
   groupByLocalDay,
   slotButtonState,
   moreActionsAriaLabel,
+  sectionPageHref,
 } from '@/lib/consultations/display';
 import type { ConsultationStatus } from '@/lib/consultations/rules';
 
@@ -26,7 +25,6 @@ const DAY = 24 * 60 * MIN;
 
 const iso = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString();
 const c = (id: string, status: ConsultationStatus, scheduledAt: string) => ({ id, status, scheduledAt });
-const ids = (items: { id: string }[]) => items.map((i) => i.id);
 
 describe('displayState', () => {
   it('is upcoming for a scheduled booking in the future', () => {
@@ -60,72 +58,6 @@ describe('DISPLAY_STATE_LABEL', () => {
       completed: 'Completed',
       cancelled: 'Cancelled',
     });
-  });
-});
-
-describe('groupForStudent', () => {
-  it('groups the seeded Alice rows by display state', () => {
-    // Mirrors scripts/seed.ts: Alice's rows as offsets from now.
-    const items = [
-      c('methods', 'scheduled', iso(2 * DAY)),
-      c('english', 'scheduled', iso(5 * DAY)),
-      c('chem', 'scheduled', iso(-3 * DAY)),
-      c('term3', 'completed', iso(-7 * DAY)),
-      c('specialist', 'completed', iso(4 * DAY)),
-      c('physics', 'cancelled', iso(5 * DAY)),
-    ];
-    const g = groupForStudent(items, now);
-    expect(ids(g.needsUpdate)).toEqual(['chem']);
-    expect(ids(g.upcoming)).toEqual(['methods', 'english']);
-    expect(ids(g.history.completed)).toEqual(['specialist', 'term3']);
-    expect(ids(g.history.cancelled)).toEqual(['physics']);
-  });
-
-  it('sorts upcoming soonest first and the rest most recent first', () => {
-    const items = [
-      c('u2', 'scheduled', iso(2 * DAY)),
-      c('u1', 'scheduled', iso(DAY)),
-      c('n2', 'scheduled', iso(-2 * DAY)),
-      c('n1', 'scheduled', iso(-DAY)),
-      c('d2', 'completed', iso(-2 * DAY)),
-      c('d1', 'completed', iso(DAY)),
-      c('x2', 'cancelled', iso(-2 * DAY)),
-      c('x1', 'cancelled', iso(-DAY)),
-    ];
-    const g = groupForStudent(items, now);
-    expect(ids(g.upcoming)).toEqual(['u1', 'u2']);
-    expect(ids(g.needsUpdate)).toEqual(['n1', 'n2']);
-    expect(ids(g.history.completed)).toEqual(['d1', 'd2']);
-    expect(ids(g.history.cancelled)).toEqual(['x1', 'x2']);
-  });
-
-  it('breaks ties on the same instant by id', () => {
-    const at = iso(DAY);
-    const g = groupForStudent([c('b', 'cancelled', at), c('a', 'cancelled', at)], now);
-    expect(ids(g.history.cancelled)).toEqual(['a', 'b']);
-  });
-
-  it('sorts by instant across offsets, not by string', () => {
-    const g = groupForStudent(
-      [c('z', 'scheduled', '2030-01-11T23:30:00Z'), c('plus10', 'scheduled', '2030-01-12T09:00:00+10:00')],
-      now,
-    );
-    expect(ids(g.upcoming)).toEqual(['plus10', 'z']);
-  });
-
-  it('returns empty groups for no items', () => {
-    expect(groupForStudent([], now)).toEqual({
-      needsUpdate: [],
-      upcoming: [],
-      history: { completed: [], cancelled: [] },
-    });
-  });
-
-  it('does not mutate input', () => {
-    const items = [c('u2', 'scheduled', iso(2 * DAY)), c('u1', 'scheduled', iso(DAY))];
-    const before = ids(items);
-    groupForStudent(items, now);
-    expect(ids(items)).toEqual(before);
   });
 });
 
@@ -197,25 +129,6 @@ describe('initialDay', () => {
 
   it('is undefined when there are no days', () => {
     expect(initialDay([])).toBeUndefined();
-  });
-});
-
-describe('activeSlotKeys', () => {
-  it('holds scheduled and completed instants, not cancelled', () => {
-    const keys = activeSlotKeys([
-      { status: 'scheduled', scheduledAt: '2030-01-12T00:00:00Z' },
-      { status: 'completed', scheduledAt: '2030-01-13T00:00:00Z' },
-      { status: 'cancelled', scheduledAt: '2030-01-14T00:00:00Z' },
-    ]);
-    expect(keys.has(Date.parse('2030-01-12T00:00:00Z'))).toBe(true);
-    expect(keys.has(Date.parse('2030-01-13T00:00:00Z'))).toBe(true);
-    expect(keys.has(Date.parse('2030-01-14T00:00:00Z'))).toBe(false);
-  });
-
-  it('keys the same instant identically across formats', () => {
-    const a = activeSlotKeys([{ status: 'scheduled', scheduledAt: '2030-01-12T00:00:00+00:00' }]);
-    const b = activeSlotKeys([{ status: 'scheduled', scheduledAt: '2030-01-12T00:00:00.000Z' }]);
-    expect([...a]).toEqual([...b]);
   });
 });
 
@@ -337,5 +250,20 @@ describe('moreActionsAriaLabel', () => {
 
   it('is never blank before the slot label is known', () => {
     expect(moreActionsAriaLabel('')).toBe('More actions');
+  });
+});
+
+describe('sectionPageHref', () => {
+  it("sets one section's cursor and keeps the other sections' pages", () => {
+    expect(sectionPageHref({ completed: 'c1', book: '1' }, 'cancelled', 'x2')).toBe(
+      '/dashboard?completed=c1&cancelled=x2',
+    );
+  });
+  it("drops the section's cursor for its first page", () => {
+    expect(sectionPageHref({ completed: 'c1', cancelled: 'x2' }, 'completed', null)).toBe('/dashboard?cancelled=x2');
+    expect(sectionPageHref({ upcoming: 'u1' }, 'upcoming', null)).toBe('/dashboard');
+  });
+  it('ignores repeated params and encodes cursors', () => {
+    expect(sectionPageHref({ upcoming: ['a', 'b'] }, 'completed', 'a+b/=')).toBe('/dashboard?completed=a%2Bb%2F%3D');
   });
 });

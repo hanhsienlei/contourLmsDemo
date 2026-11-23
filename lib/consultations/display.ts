@@ -1,4 +1,5 @@
 import { format, formatDistanceStrict } from 'date-fns';
+import { STUDENT_GROUPS, type StudentGroup } from './schema';
 import type { Consultation } from './types';
 
 /**
@@ -6,7 +7,7 @@ import type { Consultation } from './types';
  * Display only: a past `scheduled` booking can still be cancelled through
  * the API (spec D1); the UI just puts Mark complete and Reschedule first.
  */
-export type DisplayState = 'upcoming' | 'needs_update' | 'completed' | 'cancelled';
+export type DisplayState = StudentGroup;
 
 export const DISPLAY_STATE_LABEL: Record<DisplayState, string> = {
   upcoming: 'Scheduled',
@@ -16,37 +17,11 @@ export const DISPLAY_STATE_LABEL: Record<DisplayState, string> = {
 };
 
 type Timed = Pick<Consultation, 'status' | 'scheduledAt'>;
-type Groupable = Pick<Consultation, 'id' | 'status' | 'scheduledAt'>;
 
 export function displayState(item: Timed, now: Date): DisplayState {
   if (item.status === 'completed') return 'completed';
   if (item.status === 'cancelled') return 'cancelled';
   return Date.parse(item.scheduledAt) >= now.getTime() ? 'upcoming' : 'needs_update';
-}
-
-export type StudentGroups<T> = {
-  needsUpdate: T[];
-  upcoming: T[];
-  history: { completed: T[]; cancelled: T[] };
-};
-
-const soonestFirst = (a: Groupable, b: Groupable) =>
-  Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt) || a.id.localeCompare(b.id);
-const mostRecentFirst = (a: Groupable, b: Groupable) =>
-  Date.parse(b.scheduledAt) - Date.parse(a.scheduledAt) || a.id.localeCompare(b.id);
-
-/** Sections of the student dashboard (spec §6.1), each in its display order. */
-export function groupForStudent<T extends Groupable>(items: readonly T[], now: Date): StudentGroups<T> {
-  const by: Record<DisplayState, T[]> = { upcoming: [], needs_update: [], completed: [], cancelled: [] };
-  for (const item of items) by[displayState(item, now)].push(item);
-  return {
-    needsUpdate: by.needs_update.sort(mostRecentFirst),
-    upcoming: by.upcoming.sort(soonestFirst),
-    history: {
-      completed: by.completed.sort(mostRecentFirst),
-      cancelled: by.cancelled.sort(mostRecentFirst),
-    },
-  };
 }
 
 /** "in 2 days", "3 hours ago". */
@@ -130,11 +105,6 @@ export function initialDay(dayKeys: readonly string[], currentIso?: string): str
   return dayKeys[0];
 }
 
-/** Epoch ms of slots already taken by this student (scheduled or completed). */
-export function activeSlotKeys(items: readonly Pick<Consultation, 'status' | 'scheduledAt'>[]): Set<number> {
-  return new Set(items.filter((i) => i.status !== 'cancelled').map((i) => Date.parse(i.scheduledAt)));
-}
-
 export type RowAction = 'complete' | 'incomplete' | 'reschedule' | 'cancel';
 
 /** Visible text of each row action's button or menu item. */
@@ -194,4 +164,22 @@ export function rowLayout(state: DisplayState): RowLayout {
   const menuOnly = menu.filter(isDialogAction);
   const menuVisibility = menuOnly.length > 0 ? 'always' : dialogSecondary.length > 0 ? 'below-sm' : 'never';
   return { primary, secondary: dialogSecondary, menuOnly, menuVisibility };
+}
+
+/**
+ * Dashboard link to one page of one section (null: its first page). Other sections keep
+ * the page they are on; anything else in the query (such as `book=1`) is dropped.
+ */
+export function sectionPageHref(
+  current: Readonly<Record<string, string | string[] | undefined>>,
+  section: DisplayState,
+  cursor: string | null,
+): string {
+  const params = new URLSearchParams();
+  for (const group of STUDENT_GROUPS) {
+    const value = group === section ? cursor : current[group];
+    if (typeof value === 'string' && value) params.set(group, value);
+  }
+  const query = params.toString();
+  return query ? `/dashboard?${query}` : '/dashboard';
 }

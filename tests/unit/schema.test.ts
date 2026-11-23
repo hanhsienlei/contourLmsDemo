@@ -7,6 +7,7 @@ import {
   encodeCursor,
   decodeCursor,
   parseAdminListQuery,
+  parseStudentListQuery,
 } from '@/lib/consultations/schema';
 
 const valid = {
@@ -118,5 +119,29 @@ describe('studentNameSchema (sign-up)', () => {
   it('rejects a last name over 100 characters', () => {
     const r = studentNameSchema.safeParse({ firstName: 'Ada', lastName: 'x'.repeat(101) });
     expect(r.error?.issues[0].message).toBe('Last name must be 100 characters or fewer');
+  });
+});
+
+describe('parseStudentListQuery', () => {
+  const c = { scheduledAt: '2030-01-01T00:00:00.000Z', id: '11111111-1111-4111-8111-111111111111' };
+  it.each(['needs_update', 'upcoming', 'completed', 'cancelled'])('accepts group %s with default limit 20', (group) => {
+    expect(parseStudentListQuery({ group })).toEqual({ group, cursor: undefined, limit: 20 });
+  });
+  it('decodes the cursor and coerces the limit', () => {
+    expect(parseStudentListQuery({ group: 'completed', cursor: encodeCursor(c), limit: '5' })).toEqual({
+      group: 'completed',
+      cursor: c,
+      limit: 5,
+    });
+  });
+  it.each([
+    ['no group', {}],
+    ['unknown group', { group: 'all' }],
+    ['repeated group', { group: ['upcoming', 'completed'] }],
+    ['bad cursor', { group: 'upcoming', cursor: 'garbage' }],
+    ['limit over 100', { group: 'upcoming', limit: '101' }],
+    ['unknown key', { group: 'upcoming', userId: c.id }],
+  ])('rejects %s', (_, raw) => {
+    expect(parseStudentListQuery(raw)).toBeNull();
   });
 });

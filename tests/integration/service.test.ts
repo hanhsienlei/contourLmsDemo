@@ -1,6 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createAuthUser, deleteAuthUser, pgPool } from './helpers/db'
-import { book, cancel, getProfileName, listAll, listOwn, reschedule, setCompleted } from '@/lib/consultations/service'
+import {
+  book,
+  cancel,
+  getProfileName,
+  listActiveSlots,
+  listAll,
+  listOwnGroup,
+  reschedule,
+  setCompleted,
+} from '@/lib/consultations/service'
+import { decodeCursor } from '@/lib/consultations/schema'
 
 const HOUR = 3_600_000
 const stamp = Date.now()
@@ -88,18 +98,14 @@ describe('book', () => {
 describe('ownership', () => {
   it('scopes by user', async () => {
     const c = await book(A, input(slot(80)), now)
-    expect((await listOwn(B)).map((x) => x.id)).not.toContain(c.id)
-    expect((await listOwn(A)).map((x) => x.id)).toContain(c.id)
+    const upcoming = (user: string) => listOwnGroup(user, { group: 'upcoming', limit: 100 }, now)
+    expect((await upcoming(B)).items.map((x) => x.id)).not.toContain(c.id)
+    expect((await upcoming(A)).items.map((x) => x.id)).toContain(c.id)
     await expect(reschedule(B, c.id, slot(81).toISOString(), now)).rejects.toMatchObject({ code: 'not_found' })
     await expect(cancel(B, c.id)).rejects.toMatchObject({ code: 'not_found' })
     await expect(setCompleted(B, c.id, true)).rejects.toMatchObject({ code: 'not_found' })
   })
 
-  it('listOwn is ordered by scheduled_at asc', async () => {
-    const list = await listOwn(A)
-    const times = list.map((x) => new Date(x.scheduledAt).getTime())
-    expect(times).toEqual([...times].sort((a, b) => a - b))
-  })
 })
 
 describe('status changes', () => {
@@ -188,5 +194,87 @@ describe('listAll', () => {
     expect(p1.items.every((x) => ids.includes(x.id))).toBe(true)
     expect(p2.items[0].id).toBe(ids.filter((i) => !p1.items.some((x) => x.id === i))[0])
     expect(p2.items.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('listOwnGroup', () => {
+  // E's bookings, made at `now`: two stay scheduled, one completed, two cancelled.
+  let E: string
+  const ids: Record<string, string> = {}
+
+  beforeAll(async () => {
+    E = await createAuthUser(`svc-e-${stamp}@example.com`)
+    for (const [key, h] of [['s1', 26], ['s2', 50], ['s3', 74], ['done', 98], ['x1', 27], ['x2', 51]] as const) {
+      ids[key] = (await book(E, input(slot(h), key), now)).id
+    }
+    await setCompleted(E, ids.done, true)
+    await cancel(E, ids.x1)
+    await cancel(E, ids.x2)
+  })
+
+  afterAll(async () => {
+    await deleteAuthUser(E)
+  })
+
+  const all = async (group: Parameters<typeof listOwnGroup>[1]['group'], at: Date, limit = 2) => {
+    const seen: string[] = []
+    let cursor
+    let pages = 0
+    let total = -1
+    do {
+      const page = await listOwnGroup(E, { group, cursor, limit }, at)
+      seen.push(...page.items.map((x) => x.reason))
+      total = page.total
+      cursor = page.nextCursor ? decodeCursor(page.nextCursor)! : undefined
+      pages++
+    } while (cursor)
+    return { seen, total, pages }
+  }
+
+  it('pages through upcoming soonest first, with the group total on every page', async () => {
+    expect(await all('upcoming', now)).toEqual({ seen: ['s1', 's2', 's3'], total: 3, pages: 2 })
+  })
+
+  it('splits scheduled bookings into upcoming and needs_update at now', async () => {
+    const between = slot(60) // after s1 and s2, before s3
+    expect((await all('needs_update', between)).seen).toEqual(['s2', 's1'])
+    expect((await all('upcoming', between)).seen).toEqual(['s3'])
+  })
+
+  it('lists completed and cancelled most recent first, whatever the time', async () => {
+    expect((await all('completed', now)).seen).toEqual(['done'])
+    expect(await all('cancelled', now, 1)).toEqual({ seen: ['x2', 'x1'], total: 2, pages: 2 })
+  })
+
+  it('returns an empty page, not an error, for an empty group', async () => {
+    expect(await listOwnGroup(E, { group: 'needs_update', limit: 20 }, now)).toEqual({
+      items: [],
+      nextCursor: null,
+      total: 0,
+    })
+  })
+
+  it("never returns another student's bookings", async () => {
+    for (const group of ['needs_update', 'upcoming', 'completed', 'cancelled'] as const) {
+      const page = await listOwnGroup(A, { group, limit: 100 }, now)
+      for (const id of Object.values(ids)) expect(page.items.map((x) => x.id)).not.toContain(id)
+    }
+  })
+})
+
+describe('listActiveSlots', () => {
+  it('returns future slots that are scheduled or completed, never cancelled or past', async () => {
+    const F = await createAuthUser(`svc-f-${stamp}@example.com`)
+    try {
+      await book(F, input(slot(26)), now)
+      const done = await book(F, input(slot(50)), now)
+      const gone = await book(F, input(slot(74)), now)
+      await setCompleted(F, done.id, true)
+      await cancel(F, gone.id)
+      expect((await listActiveSlots(F, now)).sort()).toEqual([slot(26).getTime(), slot(50).getTime()])
+      expect(await listActiveSlots(F, slot(30))).toEqual([slot(50).getTime()])
+    } finally {
+      await deleteAuthUser(F)
+    }
   })
 })

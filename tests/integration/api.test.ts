@@ -64,11 +64,26 @@ describe('booking', () => {
     expect(res.status).toBe(201)
     expect((await res.json()).item.status).toBe('scheduled')
   })
-  it('GET lists own', async () => {
+  it('GET lists one page of a group: {items, nextCursor, total}', async () => {
     session.current = A
-    const res = await listGet()
+    const res = await listGet(req('GET', '/api/consultations?group=upcoming&limit=1'))
     expect(res.status).toBe(200)
-    expect(Array.isArray((await res.json()).items)).toBe(true)
+    const j = await res.json()
+    expect(j.items).toHaveLength(1)
+    expect(j.total).toBeGreaterThanOrEqual(1)
+    expect(j).toHaveProperty('nextCursor')
+  })
+  it.each([
+    ['no group', ''],
+    ['unknown group', '?group=all'],
+    ['bad cursor', '?group=upcoming&cursor=garbage'],
+    ['limit over 100', '?group=upcoming&limit=101'],
+    ['unknown param', '?group=upcoming&userId=x'],
+  ])('GET with %s -> 400', async (_, qs) => {
+    session.current = A
+    const res = await listGet(req('GET', `/api/consultations${qs}`))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject(errShape)
   })
   it('different Origin -> 403', async () => {
     session.current = A

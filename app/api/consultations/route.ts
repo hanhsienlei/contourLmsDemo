@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import { assertSameOrigin, handle, parseJson } from '@/lib/api/http'
+import { assertSameOrigin, errors, handle, parseJson } from '@/lib/api/http'
 import { requireRole } from '@/lib/auth/guards'
-import { createConsultationSchema } from '@/lib/consultations/schema'
-import { book, listOwn } from '@/lib/consultations/service'
+import { createConsultationSchema, parseStudentListQuery } from '@/lib/consultations/schema'
+import { book, listOwnGroup } from '@/lib/consultations/service'
 
-export const GET = handle(async () => {
+export const GET = handle(async (req: Request) => {
   const { userId } = await requireRole('student')
-  return NextResponse.json({ items: await listOwn(userId) })
+  const raw = Object.fromEntries(new URL(req.url).searchParams)
+  const q = parseStudentListQuery(raw)
+  if (!q) throw errors.validation('Invalid group, cursor or limit')
+  return NextResponse.json(await listOwnGroup(userId, q))
 })
 
 export const POST = handle(async (req: Request) => {

@@ -8,10 +8,10 @@ import {
   isWithinBusinessHours,
   type ConsultationStatus,
 } from './rules'
-import { encodeCursor, type CreateConsultationInput, type Cursor } from './schema'
-import type { AdminConsultation, Consultation, StudentName } from './types'
+import { encodeCursor, type CreateConsultationInput, type Cursor, type StudentGroup } from './schema'
+import type { AdminConsultation, Consultation, Page, StudentName } from './types'
 
-export type { AdminConsultation, Consultation, StudentName } from './types'
+export type { AdminConsultation, Consultation, Page, StudentName } from './types'
 
 const COLUMNS = 'id, user_id, first_name, last_name, reason, scheduled_at, status, created_at, updated_at'
 
@@ -59,14 +59,83 @@ export async function getProfileName(userId: string): Promise<StudentName> {
   return { firstName: data?.first_name ?? '', lastName: data?.last_name ?? '' }
 }
 
-export async function listOwn(userId: string): Promise<Consultation[]> {
+/**
+ * Keyset condition for the rows after `cursor` in (scheduled_at, id) order.
+ * Safe to interpolate: both values are re-serialised from strictly validated data
+ * (ISO datetime via Date#toISOString, uuid validated by z.uuid()), never raw input
+ * (spec 8a, rule 1). This is the only .or() filter in the codebase.
+ */
+function afterCursor(cursor: Cursor, newestFirst: boolean): string {
+  const iso = new Date(cursor.scheduledAt).toISOString()
+  const op = newestFirst ? 'lt' : 'gt'
+  return `scheduled_at.${op}."${iso}",and(scheduled_at.eq."${iso}",id.${op}.${cursor.id})`
+}
+
+function nextCursorOf(rows: { scheduled_at: string; id: string }[], limit: number): string | null {
+  const last = rows[limit - 1]
+  return rows.length > limit && last
+    ? encodeCursor({ scheduledAt: new Date(last.scheduled_at).toISOString(), id: last.id })
+    : null
+}
+
+/**
+ * One page of one dashboard section. The groups match displayState in display.ts:
+ * scheduled splits at `now` into upcoming (soonest first) and needs_update; completed
+ * and cancelled ignore the time. Every group except upcoming is most recent first.
+ * `total` counts the whole group, for the section's badge.
+ */
+export async function listOwnGroup(
+  userId: string,
+  q: { group: StudentGroup; cursor?: Cursor; limit: number },
+  now: Date = new Date(),
+): Promise<Page<Consultation>> {
+  const db = createAdminClient()
+  const nowIso = now.toISOString()
+  const newestFirst = q.group !== 'upcoming'
+
+  // Applied to both the page and the count, so they always agree on the group.
+  const inGroup = <Q extends { eq(c: string, v: string): Q; gte(c: string, v: string): Q; lt(c: string, v: string): Q }>(
+    query: Q,
+  ): Q => {
+    const own = query.eq('user_id', userId)
+    if (q.group === 'upcoming') return own.eq('status', 'scheduled').gte('scheduled_at', nowIso)
+    if (q.group === 'needs_update') return own.eq('status', 'scheduled').lt('scheduled_at', nowIso)
+    return own.eq('status', q.group)
+  }
+
+  let page = inGroup(db.from('consultations').select(COLUMNS))
+    .order('scheduled_at', { ascending: !newestFirst })
+    .order('id', { ascending: !newestFirst })
+    .limit(q.limit + 1)
+  if (q.cursor) page = page.or(afterCursor(q.cursor, newestFirst))
+
+  const [rows, count] = await Promise.all([
+    page,
+    inGroup(db.from('consultations').select('id', { count: 'exact', head: true })),
+  ])
+  if (rows.error) throw mapDbError(rows.error)
+  if (count.error) throw mapDbError(count.error)
+  const data = rows.data ?? []
+  return {
+    items: data.slice(0, q.limit).map(toConsultation),
+    nextCursor: nextCursorOf(data, q.limit),
+    total: count.count ?? 0,
+  }
+}
+
+/**
+ * Epoch ms of the student's future slots that are taken (scheduled or completed), so
+ * the slot picker can mark them. Bounded: bookings are at most 14 days ahead.
+ */
+export async function listActiveSlots(userId: string, now: Date = new Date()): Promise<number[]> {
   const { data, error } = await createAdminClient()
     .from('consultations')
-    .select(COLUMNS)
+    .select('scheduled_at')
     .eq('user_id', userId)
-    .order('scheduled_at', { ascending: true })
+    .neq('status', 'cancelled')
+    .gte('scheduled_at', now.toISOString())
   if (error) throw mapDbError(error)
-  return (data ?? []).map(toConsultation)
+  return (data ?? []).map((r) => Date.parse(r.scheduled_at))
 }
 
 export async function book(userId: string, input: CreateConsultationInput, now: Date = new Date()): Promise<Consultation> {
@@ -143,14 +212,7 @@ export async function listAll(q: { cursor?: Cursor; limit: number }): Promise<{ 
     .order('id', { ascending: true })
     .limit(q.limit + 1)
 
-  if (q.cursor) {
-    // Safe to interpolate: both values are re-serialised from strictly validated data
-    // (ISO datetime via Date#toISOString, uuid validated by z.uuid()), never raw input
-    // (spec 8a, rule 1). This is the only .or() in the codebase.
-    const iso = new Date(q.cursor.scheduledAt).toISOString()
-    const uuid = q.cursor.id
-    query = query.or(`scheduled_at.gt."${iso}",and(scheduled_at.eq."${iso}",id.gt.${uuid})`)
-  }
+  if (q.cursor) query = query.or(afterCursor(q.cursor, false))
 
   const { data, error } = await query
   if (error) throw mapDbError(error)
@@ -159,10 +221,5 @@ export async function listAll(q: { cursor?: Cursor; limit: number }): Promise<{ 
   const items: AdminConsultation[] = page.map((row) => {
     return { ...toConsultation(row), email: row.profiles?.email ?? '' }
   })
-  const last = page[page.length - 1]
-  const nextCursor =
-    rows.length > q.limit && last
-      ? encodeCursor({ scheduledAt: new Date(last.scheduled_at).toISOString(), id: last.id })
-      : null
-  return { items, nextCursor }
+  return { items, nextCursor: nextCursorOf(rows, q.limit) }
 }

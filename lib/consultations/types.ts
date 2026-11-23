@@ -17,3 +17,6 @@ export type Consultation = {
 export type AdminConsultation = Consultation & { email: string }
 
 export type StudentName = { firstName: string; lastName: string }
+
+/** One page of a keyset-paginated list. `total` counts the whole list, not the page. */
+export type Page<T> = { items: T[]; nextCursor: string | null; total: number }
