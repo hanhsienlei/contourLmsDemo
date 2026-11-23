@@ -94,7 +94,9 @@ export async function listOwnGroup(
   const newestFirst = q.group !== 'upcoming'
 
   // Applied to both the page and the count, so they always agree on the group.
-  const inGroup = <Q extends { eq(c: string, v: string): Q; gte(c: string, v: string): Q; lt(c: string, v: string): Q }>(
+  const inGroup = <
+    Q extends { eq(c: string, v: string): Q; gte(c: string, v: string): Q; lt(c: string, v: string): Q },
+  >(
     query: Q,
   ): Q => {
     const own = query.eq('user_id', userId)
@@ -138,7 +140,11 @@ export async function listActiveSlots(userId: string, now: Date = new Date()): P
   return (data ?? []).map((r) => Date.parse(r.scheduled_at))
 }
 
-export async function book(userId: string, input: CreateConsultationInput, now: Date = new Date()): Promise<Consultation> {
+export async function book(
+  userId: string,
+  input: CreateConsultationInput,
+  now: Date = new Date(),
+): Promise<Consultation> {
   const iso = assertBookable(input.scheduledAt, now)
   const { data, error } = await createAdminClient()
     .from('consultations')
@@ -163,7 +169,12 @@ type Change = {
 // One conditional update scoped by id, owner and source status. If nothing changed,
 // read the row once to decide between not found / conflict / idempotent no-op
 // (the row is already in `alreadyDoneStatus`, e.g. marking a completed booking complete).
-async function transition(userId: string, id: string, change: Change, alreadyDoneStatus?: ConsultationStatus): Promise<Consultation> {
+async function transition(
+  userId: string,
+  id: string,
+  change: Change,
+  alreadyDoneStatus?: ConsultationStatus,
+): Promise<Consultation> {
   const db = createAdminClient()
   const { data, error } = await db
     .from('consultations')
@@ -189,7 +200,12 @@ async function transition(userId: string, id: string, change: Change, alreadyDon
   throw errors.conflict('Only scheduled consultations can be rescheduled or cancelled')
 }
 
-export async function reschedule(userId: string, id: string, scheduledAt: string, now: Date = new Date()): Promise<Consultation> {
+export async function reschedule(
+  userId: string,
+  id: string,
+  scheduledAt: string,
+  now: Date = new Date(),
+): Promise<Consultation> {
   const iso = assertBookable(scheduledAt, now)
   return transition(userId, id, { from: 'scheduled', patch: { scheduled_at: iso } })
 }
@@ -204,7 +220,10 @@ export async function cancel(userId: string, id: string): Promise<Consultation> 
   return transition(userId, id, { from: 'scheduled', patch: { status: 'cancelled' } })
 }
 
-export async function listAll(q: { cursor?: Cursor; limit: number }): Promise<{ items: AdminConsultation[]; nextCursor: string | null }> {
+export async function listAll(q: {
+  cursor?: Cursor
+  limit: number
+}): Promise<{ items: AdminConsultation[]; nextCursor: string | null }> {
   let query = createAdminClient()
     .from('consultations')
     .select(`${COLUMNS}, profiles(email)`)

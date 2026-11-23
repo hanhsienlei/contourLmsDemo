@@ -55,10 +55,7 @@ async function main() {
   const aliceId = await createUser(EMAILS.alice, { first_name: 'Alice', last_name: 'Nguyen' })
   const bobId = await createUser(EMAILS.bob, { first_name: 'Bob', last_name: 'Smith' })
 
-  const { error: roleErr } = await supabase
-    .from('user_roles')
-    .update({ role: 'admin' })
-    .eq('user_id', adminId)
+  const { error: roleErr } = await supabase.from('user_roles').update({ role: 'admin' }).eq('user_id', adminId)
   if (roleErr) throw roleErr
 
   const alice = { user_id: aliceId, first_name: 'Alice', last_name: 'Nguyen' }

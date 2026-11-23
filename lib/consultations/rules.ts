@@ -1,29 +1,29 @@
-export const SLOT_MINUTES = 15;
-export const MIN_LEAD_HOURS = 24;
-export const MAX_AHEAD_DAYS = 14;
+export const SLOT_MINUTES = 15
+export const MIN_LEAD_HOURS = 24
+export const MAX_AHEAD_DAYS = 14
 
-export type ConsultationStatus = 'scheduled' | 'completed' | 'cancelled';
+export type ConsultationStatus = 'scheduled' | 'completed' | 'cancelled'
 
-const SLOT_MS = SLOT_MINUTES * 60_000;
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
+const SLOT_MS = SLOT_MINUTES * 60_000
+const HOUR_MS = 3_600_000
+const DAY_MS = 24 * HOUR_MS
 
 export function isSlotAligned(d: Date): boolean {
-  return d.getTime() % SLOT_MS === 0;
+  return d.getTime() % SLOT_MS === 0
 }
 
 export function bookingWindow(now: Date): { earliest: Date; latest: Date } {
-  const t = now.getTime();
+  const t = now.getTime()
   return {
     earliest: new Date(t + MIN_LEAD_HOURS * HOUR_MS),
     latest: new Date(t + MAX_AHEAD_DAYS * DAY_MS),
-  };
+  }
 }
 
 export function isWithinBookingWindow(d: Date, now: Date): boolean {
-  const { earliest, latest } = bookingWindow(now);
-  const t = d.getTime();
-  return t >= earliest.getTime() && t <= latest.getTime();
+  const { earliest, latest } = bookingWindow(now)
+  const t = d.getTime()
+  return t >= earliest.getTime() && t <= latest.getTime()
 }
 
 /**
@@ -31,10 +31,10 @@ export function isWithinBookingWindow(d: Date, now: Date): boolean {
  * wall clock of BUSINESS_TIME_ZONE. Contour is Melbourne-based, so a student
  * anywhere sees the same staffed hours converted to their local time.
  */
-export const BUSINESS_TIME_ZONE = 'Australia/Melbourne';
-export const BUSINESS_ZONE_LABEL = 'Melbourne';
-export const OPEN_HOUR = 8;
-export const CLOSE_HOUR = 20;
+export const BUSINESS_TIME_ZONE = 'Australia/Melbourne'
+export const BUSINESS_ZONE_LABEL = 'Melbourne'
+export const OPEN_HOUR = 8
+export const CLOSE_HOUR = 20
 
 const zoneFormat = new Intl.DateTimeFormat('en-AU', {
   timeZone: BUSINESS_TIME_ZONE,
@@ -44,53 +44,53 @@ const zoneFormat = new Intl.DateTimeFormat('en-AU', {
   hour: 'numeric',
   minute: 'numeric',
   hourCycle: 'h23',
-});
+})
 
 function zonedParts(d: Date) {
-  const parts = zoneFormat.formatToParts(d);
-  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)!.value);
-  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute') };
+  const parts = zoneFormat.formatToParts(d)
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)!.value)
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute') }
 }
 
 export function isWithinBusinessHours(d: Date): boolean {
-  const { hour, minute } = zonedParts(d);
-  const minutes = hour * 60 + minute;
-  return minutes >= OPEN_HOUR * 60 && minutes < CLOSE_HOUR * 60;
+  const { hour, minute } = zonedParts(d)
+  const minutes = hour * 60 + minute
+  return minutes >= OPEN_HOUR * 60 && minutes < CLOSE_HOUR * 60
 }
 
 /** The instant that is `hour:minute` on the business wall clock, `dayOffset` days after `from`'s business date. */
 export function atBusinessTime(from: Date, dayOffset: number, hour: number, minute: number): Date {
-  const p = zonedParts(from);
-  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day + dayOffset, hour, minute);
+  const p = zonedParts(from)
+  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day + dayOffset, hour, minute)
   // Find the zone offset at that moment by formatting the guess, then correct for it.
-  const q = zonedParts(new Date(wallAsUtc));
-  const offset = Date.UTC(q.year, q.month - 1, q.day, q.hour, q.minute) - wallAsUtc;
-  return new Date(wallAsUtc - offset);
+  const q = zonedParts(new Date(wallAsUtc))
+  const offset = Date.UTC(q.year, q.month - 1, q.day, q.hour, q.minute) - wallAsUtc
+  return new Date(wallAsUtc - offset)
 }
 
 export function availableSlots(now: Date): Date[] {
-  const { earliest, latest } = bookingWindow(now);
-  const end = latest.getTime();
-  const slots: Date[] = [];
+  const { earliest, latest } = bookingWindow(now)
+  const end = latest.getTime()
+  const slots: Date[] = []
   for (let t = Math.ceil(earliest.getTime() / SLOT_MS) * SLOT_MS; t <= end; t += SLOT_MS) {
-    const d = new Date(t);
-    if (isWithinBusinessHours(d)) slots.push(d);
+    const d = new Date(t)
+    if (isWithinBusinessHours(d)) slots.push(d)
   }
-  return slots;
+  return slots
 }
 
 /** Minutes after midnight as a 12-hour clock time, e.g. 480 -> "8:00 am". */
 function clockTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = String(minutes % 60).padStart(2, '0');
-  return `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'am' : 'pm'}`;
+  const h = Math.floor(minutes / 60)
+  const m = String(minutes % 60).padStart(2, '0')
+  return `${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'am' : 'pm'}`
 }
 
-const FIRST_START = clockTime(OPEN_HOUR * 60);
-const LAST_START = clockTime(CLOSE_HOUR * 60 - SLOT_MINUTES);
+const FIRST_START = clockTime(OPEN_HOUR * 60)
+const LAST_START = clockTime(CLOSE_HOUR * 60 - SLOT_MINUTES)
 
 // User-facing wording for the rules above, built from the same constants so it can't drift.
-export const HOURS_MESSAGE = `Consultations start between ${FIRST_START} and ${LAST_START} ${BUSINESS_ZONE_LABEL} time`;
-export const WINDOW_MESSAGE = `Consultations must be booked between ${MIN_LEAD_HOURS} hours and ${MAX_AHEAD_DAYS} days ahead`;
-export const BOOKING_RULES_SUMMARY = `${HOURS_MESSAGE}, ${MIN_LEAD_HOURS} hours to ${MAX_AHEAD_DAYS} days ahead.`;
-export const BOOKING_HELP = `Book ${MIN_LEAD_HOURS / 24} to ${MAX_AHEAD_DAYS} days ahead, ${FIRST_START} to ${LAST_START} ${BUSINESS_ZONE_LABEL} time.`;
+export const HOURS_MESSAGE = `Consultations start between ${FIRST_START} and ${LAST_START} ${BUSINESS_ZONE_LABEL} time`
+export const WINDOW_MESSAGE = `Consultations must be booked between ${MIN_LEAD_HOURS} hours and ${MAX_AHEAD_DAYS} days ahead`
+export const BOOKING_RULES_SUMMARY = `${HOURS_MESSAGE}, ${MIN_LEAD_HOURS} hours to ${MAX_AHEAD_DAYS} days ahead.`
+export const BOOKING_HELP = `Book ${MIN_LEAD_HOURS / 24} to ${MAX_AHEAD_DAYS} days ahead, ${FIRST_START} to ${LAST_START} ${BUSINESS_ZONE_LABEL} time.`

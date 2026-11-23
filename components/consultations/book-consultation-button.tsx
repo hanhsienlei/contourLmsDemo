@@ -28,13 +28,7 @@ export function BookConsultationButton({
   return (
     <>
       <Button onClick={() => setOpen(true)}>Book a consultation</Button>
-      <ConsultationDialog
-        mode="book"
-        open={open}
-        onOpenChange={setOpen}
-        occupied={occupiedSet}
-        defaults={defaults}
-      />
+      <ConsultationDialog mode="book" open={open} onOpenChange={setOpen} occupied={occupiedSet} defaults={defaults} />
     </>
   )
 }

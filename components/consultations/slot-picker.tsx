@@ -23,17 +23,13 @@ type Props = {
 export function SlotPicker({ value, onChange, occupied, currentIso }: Props) {
   const mounted = useMounted()
   const id = useId()
-  const days = useMemo(
-    () => (mounted ? groupByLocalDay(availableSlots(new Date())) : null),
-    [mounted],
-  )
+  const days = useMemo(() => (mounted ? groupByLocalDay(availableSlots(new Date())) : null), [mounted])
   const [pickedDay, setPickedDay] = useState<string>()
   if (!days) return <div className="h-9" aria-hidden />
 
   // Book mode starts with no day; reschedule defaults to the booking's day (or the first bookable one).
   const day =
-    pickedDay ??
-    (value ? dayKey(new Date(value)) : currentIso ? initialDay([...days.keys()], currentIso) : undefined)
+    pickedDay ?? (value ? dayKey(new Date(value)) : currentIso ? initialDay([...days.keys()], currentIso) : undefined)
 
   const times = (day && days.get(day)) || []
 

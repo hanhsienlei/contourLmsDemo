@@ -172,7 +172,10 @@ describe('extra validation', () => {
   const id = '00000000-0000-4000-8000-000000000000'
   it('PATCH with both keys -> 400', async () => {
     session.current = A
-    const res = await patchById(req('PATCH', `/api/consultations/${id}`, { completed: true, scheduledAt: slot() }), ctx(id))
+    const res = await patchById(
+      req('PATCH', `/api/consultations/${id}`, { completed: true, scheduledAt: slot() }),
+      ctx(id),
+    )
     expect(res.status).toBe(400)
   })
   it('PATCH with {} -> 400', async () => {

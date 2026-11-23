@@ -28,7 +28,8 @@ describe('schema', () => {
 
   it('has RLS enabled on every public table', async () => {
     const { rows } = await pgPool.query(
-      `select tablename from pg_tables where schemaname = 'public' and not rowsecurity`)
+      `select tablename from pg_tables where schemaname = 'public' and not rowsecurity`,
+    )
     expect(rows).toEqual([])
   })
 
@@ -59,8 +60,9 @@ describe('schema', () => {
       role: 'admin',
     })
     users.push(none, odd)
-    const p = await pgPool.query(
-      'select user_id, first_name, last_name from public.profiles where user_id = any($1)', [[none, odd]])
+    const p = await pgPool.query('select user_id, first_name, last_name from public.profiles where user_id = any($1)', [
+      [none, odd],
+    ])
     const byId = Object.fromEntries(p.rows.map((r) => [r.user_id, r]))
     expect(byId[none]).toMatchObject({ first_name: null, last_name: null })
     expect(byId[odd]).toMatchObject({ first_name: null, last_name: 'x'.repeat(100) })
@@ -69,8 +71,7 @@ describe('schema', () => {
   })
 
   it('rejects a whitespace-only profile name', async () => {
-    await expectCode(
-      pgPool.query(`update public.profiles set first_name = '  ' where user_id = $1`, [uid]), '23514')
+    await expectCode(pgPool.query(`update public.profiles set first_name = '  ' where user_id = $1`, [uid]), '23514')
   })
 
   it('rejects misaligned scheduled_at, including fractional seconds', async () => {

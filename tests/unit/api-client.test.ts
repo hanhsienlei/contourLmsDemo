@@ -37,10 +37,7 @@ describe('apiFetch', () => {
 
   it('throws ApiClientError from the error body on 409', async () => {
     stubFetch(
-      Response.json(
-        { error: { code: 'conflict', message: 'That time slot is already booked' } },
-        { status: 409 },
-      ),
+      Response.json({ error: { code: 'conflict', message: 'That time slot is already booked' } }, { status: 409 }),
     )
     const err = await rejection(apiFetch('/api/consultations'))
     expect(err).toBeInstanceOf(ApiClientError)

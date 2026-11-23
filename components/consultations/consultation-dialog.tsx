@@ -35,9 +35,7 @@ type Common = {
 
 type Action = ReturnType<typeof useApiAction>
 
-type Props =
-  | (Common & { mode: 'book'; defaults: StudentName })
-  | (Common & { mode: 'reschedule'; item: Consultation })
+type Props = (Common & { mode: 'book'; defaults: StudentName }) | (Common & { mode: 'reschedule'; item: Consultation })
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null
@@ -107,11 +105,7 @@ function BookForm({
   const [reason, slot] = useWatch({ control, name: ['reason', 'scheduledAt'] })
 
   const onSubmit = (body: CreateConsultationInput) =>
-    run(
-      () => apiFetch('/api/consultations', { method: 'POST', body }),
-      'Consultation booked',
-      onDone,
-    )
+    run(() => apiFetch('/api/consultations', { method: 'POST', body }), 'Consultation booked', onDone)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5" noValidate>

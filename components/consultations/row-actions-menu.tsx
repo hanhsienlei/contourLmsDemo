@@ -33,7 +33,9 @@ export function RowActionsMenu({
           <MoreHorizontal aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>{children}</DropdownMenuContent>
+      <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>
+        {children}
+      </DropdownMenuContent>
     </DropdownMenu>
   )
 }

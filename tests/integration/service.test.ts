@@ -44,7 +44,10 @@ afterAll(async () => {
 
 describe('getProfileName', () => {
   it("returns the account's sign-up name", async () => {
-    const id = await createAuthUser(`svc-n-${stamp}@example.com`, undefined, { first_name: 'Ada', last_name: 'Lovelace' })
+    const id = await createAuthUser(`svc-n-${stamp}@example.com`, undefined, {
+      first_name: 'Ada',
+      last_name: 'Lovelace',
+    })
     try {
       expect(await getProfileName(id)).toEqual({ firstName: 'Ada', lastName: 'Lovelace' })
     } finally {
@@ -72,15 +75,21 @@ describe('book', () => {
   })
 
   it('rejects 15 minutes before the window opens', async () => {
-    await expect(book(A, input(new Date(slot(24).getTime() - 15 * 60_000)), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(book(A, input(new Date(slot(24).getTime() - 15 * 60_000)), now)).rejects.toMatchObject({
+      code: 'validation',
+    })
   })
 
   it('rejects 15 minutes after the window closes', async () => {
-    await expect(book(A, input(new Date(slot(14 * 24).getTime() + 15 * 60_000)), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(book(A, input(new Date(slot(14 * 24).getTime() + 15 * 60_000)), now)).rejects.toMatchObject({
+      code: 'validation',
+    })
   })
 
   it('rejects misaligned slots', async () => {
-    await expect(book(A, input(new Date(slot(60).getTime() + 60_000)), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(book(A, input(new Date(slot(60).getTime() + 60_000)), now)).rejects.toMatchObject({
+      code: 'validation',
+    })
   })
 
   it('accepts exactly now + 24h', async () => {
@@ -105,7 +114,6 @@ describe('ownership', () => {
     await expect(cancel(B, c.id)).rejects.toMatchObject({ code: 'not_found' })
     await expect(setCompleted(B, c.id, true)).rejects.toMatchObject({ code: 'not_found' })
   })
-
 })
 
 describe('status changes', () => {
@@ -146,7 +154,9 @@ describe('status changes', () => {
   it('reschedule enforces window and alignment', async () => {
     const c = await book(B, input(slot(144)), now)
     await expect(reschedule(B, c.id, slot(1).toISOString(), now)).rejects.toMatchObject({ code: 'validation' })
-    await expect(reschedule(B, c.id, new Date(slot(145).getTime() + 1000).toISOString(), now)).rejects.toMatchObject({ code: 'validation' })
+    await expect(reschedule(B, c.id, new Date(slot(145).getTime() + 1000).toISOString(), now)).rejects.toMatchObject({
+      code: 'validation',
+    })
   })
 
   it('book and reschedule enforce Melbourne business hours', async () => {
@@ -166,7 +176,10 @@ describe('listAll', () => {
     const c = await book(C, input(slot(150)), now)
     await cancel(C, c.id)
     const { items } = await listAll({
-      cursor: { scheduledAt: new Date(slot(150).getTime() - 1).toISOString(), id: '00000000-0000-0000-0000-000000000000' },
+      cursor: {
+        scheduledAt: new Date(slot(150).getTime() - 1).toISOString(),
+        id: '00000000-0000-0000-0000-000000000000',
+      },
       limit: 100,
     })
     const mine = items.find((x) => x.id === c.id)
@@ -204,7 +217,14 @@ describe('listOwnGroup', () => {
 
   beforeAll(async () => {
     E = await createAuthUser(`svc-e-${stamp}@example.com`)
-    for (const [key, h] of [['s1', 26], ['s2', 50], ['s3', 74], ['done', 98], ['x1', 27], ['x2', 51]] as const) {
+    for (const [key, h] of [
+      ['s1', 26],
+      ['s2', 50],
+      ['s3', 74],
+      ['done', 98],
+      ['x1', 27],
+      ['x2', 51],
+    ] as const) {
       ids[key] = (await book(E, input(slot(h), key), now)).id
     }
     await setCompleted(E, ids.done, true)
