@@ -145,3 +145,13 @@ describe('parseStudentListQuery', () => {
     expect(parseStudentListQuery(raw)).toBeNull()
   })
 })
+
+describe('parseAdminListQuery with a group', () => {
+  it('accepts an optional group', () => {
+    expect(parseAdminListQuery({ group: 'cancelled' })).toEqual({ group: 'cancelled', cursor: undefined, limit: 20 })
+    expect(parseAdminListQuery({})).toEqual({ cursor: undefined, limit: 20 })
+  })
+  it('rejects an unknown group', () => {
+    expect(parseAdminListQuery({ group: 'all' })).toBeNull()
+  })
+})

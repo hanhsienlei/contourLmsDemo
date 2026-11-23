@@ -4,8 +4,10 @@ import {
   book,
   cancel,
   getProfileName,
+  countGroups,
   listActiveSlots,
   listAll,
+  listAllGroup,
   listOwnGroup,
   reschedule,
   setCompleted,
@@ -296,5 +298,70 @@ describe('listActiveSlots', () => {
     } finally {
       await deleteAuthUser(F)
     }
+  })
+})
+
+describe('admin groups', () => {
+  // G and H, made at a time far from every other test's, so only their rows fall in [base, base + 60h].
+  const base = new Date('2031-03-03T09:00:00+11:00')
+  const at = (h: number) => new Date(base.getTime() + h * HOUR)
+  let G: string
+  let H: string
+
+  beforeAll(async () => {
+    G = await createAuthUser(`svc-g-${stamp}@example.com`)
+    H = await createAuthUser(`svc-h-${stamp}@example.com`)
+    await book(G, input(at(26), 'g-up'), base)
+    await book(H, input(at(27), 'h-up'), base)
+    const done = await book(H, input(at(50), 'h-done'), base)
+    await setCompleted(H, done.id, true)
+    const gone = await book(G, input(at(51), 'g-gone'), base)
+    await cancel(G, gone.id)
+  })
+
+  afterAll(async () => {
+    await deleteAuthUser(G)
+    await deleteAuthUser(H)
+  })
+
+  // Every row of a group, filtered to G's and H's.
+  const reasons = async (group: Parameters<typeof listAllGroup>[0]['group'], at: Date) => {
+    const out: string[] = []
+    let cursor
+    do {
+      const page = await listAllGroup({ group, cursor, limit: 50 }, at)
+      out.push(...page.items.filter((x) => /^[gh]-/.test(x.reason)).map((x) => `${x.reason} ${x.email.split('@')[0]}`))
+      cursor = page.nextCursor ? decodeCursor(page.nextCursor)! : undefined
+    } while (cursor)
+    return out
+  }
+
+  it("lists every student's bookings in a group, with the account email", async () => {
+    expect(await reasons('upcoming', base)).toEqual([`g-up svc-g-${stamp}`, `h-up svc-h-${stamp}`])
+    expect(await reasons('completed', base)).toEqual([`h-done svc-h-${stamp}`])
+    expect(await reasons('cancelled', base)).toEqual([`g-gone svc-g-${stamp}`])
+  })
+
+  it('moves past scheduled bookings to needs_update, most recent first', async () => {
+    expect(await reasons('needs_update', at(30))).toEqual([`h-up svc-h-${stamp}`, `g-up svc-g-${stamp}`])
+  })
+
+  it('pages with a total for the whole group', async () => {
+    const page = await listAllGroup({ group: 'cancelled', limit: 1 }, base)
+    expect(page.items).toHaveLength(1)
+    expect(page.total).toBeGreaterThanOrEqual(1)
+  })
+
+  it('counts each group for one student, or for everyone', async () => {
+    expect(await countGroups({ userId: G }, base)).toEqual({ needs_update: 0, upcoming: 1, completed: 0, cancelled: 1 })
+    expect(await countGroups({ userId: H }, at(30))).toEqual({
+      needs_update: 1,
+      upcoming: 0,
+      completed: 1,
+      cancelled: 0,
+    })
+    const all = await countGroups({}, base)
+    for (const n of Object.values(all)) expect(n).toBeGreaterThanOrEqual(0)
+    expect(all.upcoming).toBe((await listAllGroup({ group: 'upcoming', limit: 1 }, base)).total)
   })
 })

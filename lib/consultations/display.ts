@@ -162,6 +162,11 @@ export function detailsActions(state: DisplayState): RowAction[] {
   return [...visible, ...menu]
 }
 
+/** Label of an action in the details dialog. A bare "Cancel" in a dialog footer reads as "close the dialog". */
+export function detailsActionLabel(action: RowAction): string {
+  return action === 'cancel' ? 'Cancel booking' : ROW_ACTION_LABEL[action]
+}
+
 /** Actions that open a dialog (the others run inline). */
 export type DialogAction = Extract<RowAction, 'reschedule' | 'cancel'>
 const isDialogAction = (a: RowAction): a is DialogAction => a === 'reschedule' || a === 'cancel'
@@ -184,6 +189,23 @@ export function rowLayout(state: DisplayState): RowLayout {
   const menuOnly = menu.filter(isDialogAction)
   const menuVisibility = menuOnly.length > 0 ? 'always' : dialogSecondary.length > 0 ? 'below-sm' : 'never'
   return { primary, secondary: dialogSecondary, menuOnly, menuVisibility }
+}
+
+/** Admin status tabs (spec §6.5), in display order. Upcoming is the default. */
+export const ADMIN_TABS: readonly { group: DisplayState; label: string }[] = [
+  { group: 'upcoming', label: 'Upcoming' },
+  { group: 'needs_update', label: 'Needs update' },
+  { group: 'completed', label: 'Completed' },
+  { group: 'cancelled', label: 'Cancelled' },
+]
+
+/** Admin link to one page of one tab (null cursor: its first page). The default tab stays out of the URL. */
+export function adminPageHref(group: DisplayState, cursor: string | null): string {
+  const params = new URLSearchParams()
+  if (group !== 'upcoming') params.set('group', group)
+  if (cursor) params.set('cursor', cursor)
+  const query = params.toString()
+  return query ? `/admin?${query}` : '/admin'
 }
 
 /**

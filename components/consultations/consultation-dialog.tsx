@@ -234,7 +234,7 @@ export function ConsultationDialog(props: Props) {
             <DialogHeader>
               <DialogTitle>Reschedule consultation</DialogTitle>
               <DialogDescription>
-                <span className="block font-medium text-foreground">{props.item.reason}</span>
+                <span className="line-clamp-2 break-words font-medium text-foreground">{props.item.reason}</span>
                 <span className="block">Currently {formatSlot(props.item.scheduledAt)}</span>
               </DialogDescription>
             </DialogHeader>

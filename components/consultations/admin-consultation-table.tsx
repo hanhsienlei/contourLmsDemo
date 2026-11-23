@@ -27,7 +27,7 @@ export function AdminConsultationTable({ items, now }: { items: AdminConsultatio
         {items.length === 0 && (
           <TableRow>
             <TableCell colSpan={4} className="text-center text-muted-foreground">
-              No consultations yet.
+              No consultations in this list.
             </TableCell>
           </TableRow>
         )}

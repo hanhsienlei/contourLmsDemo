@@ -18,6 +18,9 @@ import {
   sectionPageHref,
   actionVariant,
   detailsActions,
+  ADMIN_TABS,
+  adminPageHref,
+  detailsActionLabel,
 } from '@/lib/consultations/display'
 import type { ConsultationStatus } from '@/lib/consultations/rules'
 
@@ -297,5 +300,37 @@ describe('detailsActions', () => {
     expect(detailsActions('needs_update')).toEqual(['complete', 'reschedule', 'cancel'])
     expect(detailsActions('completed')).toEqual(['incomplete'])
     expect(detailsActions('cancelled')).toEqual([])
+  })
+})
+
+describe('ADMIN_TABS', () => {
+  it('lists every group once, Upcoming first, with its label', () => {
+    expect(ADMIN_TABS).toEqual([
+      { group: 'upcoming', label: 'Upcoming' },
+      { group: 'needs_update', label: 'Needs update' },
+      { group: 'completed', label: 'Completed' },
+      { group: 'cancelled', label: 'Cancelled' },
+    ])
+  })
+})
+
+describe('adminPageHref', () => {
+  it('leaves the default tab out of the URL', () => {
+    expect(adminPageHref('upcoming', null)).toBe('/admin')
+    expect(adminPageHref('upcoming', 'c1')).toBe('/admin?cursor=c1')
+  })
+  it('names other tabs and encodes the cursor', () => {
+    expect(adminPageHref('cancelled', null)).toBe('/admin?group=cancelled')
+    expect(adminPageHref('completed', 'a+b/=')).toBe('/admin?group=completed&cursor=a%2Bb%2F%3D')
+  })
+})
+
+describe('detailsActionLabel', () => {
+  it('says "Cancel booking" in the dialog, where a bare "Cancel" would read as closing it', () => {
+    expect(detailsActionLabel('cancel')).toBe('Cancel booking')
+  })
+  it('keeps the row labels for the rest', () => {
+    for (const a of ['complete', 'incomplete', 'reschedule'] as const)
+      expect(detailsActionLabel(a)).toBe(ROW_ACTION_LABEL[a])
   })
 })

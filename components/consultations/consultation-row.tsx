@@ -7,6 +7,7 @@ import {
   ROW_ACTION_LABEL,
   actionAriaLabel,
   actionVariant,
+  detailsActionLabel,
   detailsActions,
   rowLayout,
   type DialogAction,
@@ -150,7 +151,7 @@ export function ConsultationRow({
                     size="sm"
                     onClick={() => setOpenDialog(action)}
                   >
-                    {ROW_ACTION_LABEL[action]}
+                    {detailsActionLabel(action)}
                   </Button>
                 ),
               )
