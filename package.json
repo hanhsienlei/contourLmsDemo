@@ -10,7 +10,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
-    "db:seed:bulk": "tsx scripts/seed-bulk.ts",
     "db:reset": "supabase db reset && npm run db:seed",
     "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts",
     "format": "prettier --write .",
