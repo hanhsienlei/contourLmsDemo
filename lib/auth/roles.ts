@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { ApiError } from '@/lib/api/http'
+import { mapDbError } from '@/lib/api/http'
 
 export type AppRole = 'student' | 'admin'
 
@@ -11,10 +11,7 @@ export const getRole = cache(async (userId: string): Promise<AppRole | null> => 
     .select('role')
     .eq('user_id', userId)
     .maybeSingle()
-  if (error) {
-    console.error(error)
-    throw new ApiError(500, 'internal', 'Something went wrong')
-  }
+  if (error) throw mapDbError(error)
   if (!data) return null
   return data.role === 'student' || data.role === 'admin' ? data.role : null
 })

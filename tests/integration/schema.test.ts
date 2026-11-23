@@ -28,7 +28,8 @@ describe('schema', () => {
 
   it('has RLS enabled on every public table', async () => {
     const { rows } = await pgPool.query(
-      `select tablename from pg_tables where schemaname = 'public' and not rowsecurity`)
+      `select tablename from pg_tables where schemaname = 'public' and not rowsecurity`,
+    )
     expect(rows).toEqual([])
   })
 
@@ -59,8 +60,9 @@ describe('schema', () => {
       role: 'admin',
     })
     users.push(none, odd)
-    const p = await pgPool.query(
-      'select user_id, first_name, last_name from public.profiles where user_id = any($1)', [[none, odd]])
+    const p = await pgPool.query('select user_id, first_name, last_name from public.profiles where user_id = any($1)', [
+      [none, odd],
+    ])
     const byId = Object.fromEntries(p.rows.map((r) => [r.user_id, r]))
     expect(byId[none]).toMatchObject({ first_name: null, last_name: null })
     expect(byId[odd]).toMatchObject({ first_name: null, last_name: 'x'.repeat(100) })
@@ -69,8 +71,7 @@ describe('schema', () => {
   })
 
   it('rejects a whitespace-only profile name', async () => {
-    await expectCode(
-      pgPool.query(`update public.profiles set first_name = '  ' where user_id = $1`, [uid]), '23514')
+    await expectCode(pgPool.query(`update public.profiles set first_name = '  ' where user_id = $1`, [uid]), '23514')
   })
 
   it('rejects misaligned scheduled_at, including fractional seconds', async () => {
@@ -84,6 +85,42 @@ describe('schema', () => {
     await insert(uid, t, 'cancelled')
     await insert(uid, t, 'scheduled')
     await expectCode(insert(uid, t, 'scheduled'), '23505')
+  })
+
+  describe('status changes (backstop under the service, which bypasses RLS)', () => {
+    let n = 0
+    // A fresh slot per row, so the one-active-booking-per-slot index never interferes.
+    const row = async (status: string) => {
+      const t = new Date(Date.UTC(2031, 0, 1, 0, 0) + n++ * 900_000).toISOString()
+      const { rows } = await pgPool.query(
+        `insert into public.consultations (user_id, first_name, last_name, reason, scheduled_at, status)
+         values ($1, 'A', 'B', 'help', $2, $3) returning id`,
+        [uid, t, status],
+      )
+      return rows[0].id as string
+    }
+    const set = (id: string, sql: string) => pgPool.query(`update public.consultations set ${sql} where id = $1`, [id])
+
+    it.each([
+      ['scheduled', "status = 'completed'"],
+      ['completed', "status = 'scheduled'"],
+      ['scheduled', "status = 'cancelled'"],
+      ['scheduled', "scheduled_at = scheduled_at + interval '1 day'"],
+      ['completed', "reason = 'still editable'"],
+    ])('allows %s: %s', async (from, sql) => {
+      await expect(set(await row(from), sql)).resolves.toMatchObject({ rowCount: 1 })
+    })
+
+    it.each([
+      ['cancelled', "status = 'scheduled'"],
+      ['cancelled', "status = 'completed'"],
+      ['cancelled', "reason = 'edited'"],
+      ['cancelled', "scheduled_at = scheduled_at + interval '1 day'"],
+      ['completed', "status = 'cancelled'"],
+      ['completed', "scheduled_at = scheduled_at + interval '1 day'"],
+    ])('rejects %s: %s', async (from, sql) => {
+      await expectCode(set(await row(from), sql), '23514')
+    })
   })
 
   it('trims are enforced: whitespace-only reason is rejected', async () => {

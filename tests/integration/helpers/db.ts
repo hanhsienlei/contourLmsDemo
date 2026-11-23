@@ -4,11 +4,9 @@ import pg from 'pg'
 export const pgPool = new pg.Pool({ connectionString: process.env.SUPABASE_DB_URL })
 
 function secretClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  )
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 }
 
 export async function createAuthUser(

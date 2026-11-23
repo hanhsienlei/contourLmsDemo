@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
-import { LogoutButton } from "@/components/logout-button";
+import { createClient } from '@/lib/supabase/server'
+import { LogoutButton } from '@/components/logout-button'
 
 export async function AppHeader() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const email = typeof data?.claims?.email === "string" ? data.claims.email : null;
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getClaims()
+  const email = typeof data?.claims?.email === 'string' ? data.claims.email : null
 
   return (
     <header className="w-full border-b border-b-foreground/10">
@@ -16,5 +16,5 @@ export async function AppHeader() {
         </div>
       </div>
     </header>
-  );
+  )
 }

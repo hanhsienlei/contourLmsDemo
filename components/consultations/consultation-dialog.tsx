@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api/client'
 import { createConsultationSchema, type CreateConsultationInput } from '@/lib/consultations/schema'
-import type { Consultation, StudentName } from '@/lib/consultations/service'
+import type { Consultation, StudentName } from '@/lib/consultations/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -35,9 +35,7 @@ type Common = {
 
 type Action = ReturnType<typeof useApiAction>
 
-type Props =
-  | (Common & { mode: 'book'; defaults: StudentName })
-  | (Common & { mode: 'reschedule'; item: Consultation })
+type Props = (Common & { mode: 'book'; defaults: StudentName }) | (Common & { mode: 'reschedule'; item: Consultation })
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null
@@ -107,11 +105,7 @@ function BookForm({
   const [reason, slot] = useWatch({ control, name: ['reason', 'scheduledAt'] })
 
   const onSubmit = (body: CreateConsultationInput) =>
-    run(
-      () => apiFetch('/api/consultations', { method: 'POST', body }),
-      'Consultation booked',
-      onDone,
-    )
+    run(() => apiFetch('/api/consultations', { method: 'POST', body }), 'Consultation booked', onDone)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5" noValidate>

@@ -10,7 +10,7 @@ import {
   type DialogAction,
   type DisplayState,
 } from '@/lib/consultations/display'
-import type { Consultation } from '@/lib/consultations/service'
+import type { Consultation } from '@/lib/consultations/types'
 import { cn } from '@/lib/utils'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'

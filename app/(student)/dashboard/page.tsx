@@ -1,16 +1,43 @@
+import Link from 'next/link'
 import { BookConsultationButton } from '@/components/consultations/book-consultation-button'
 import { TimeZoneNote } from '@/components/consultations/time-zone-note'
 import { ConsultationList } from '@/components/consultations/consultation-list'
 import { requireRolePage } from '@/lib/auth/guards'
-import { activeSlotKeys } from '@/lib/consultations/display'
-import { getProfileName, listOwn } from '@/lib/consultations/service'
+import { STUDENT_GROUPS, parseStudentListQuery, type StudentGroup } from '@/lib/consultations/schema'
+import { getProfileName, listActiveSlots, listOwnGroup } from '@/lib/consultations/service'
+
+const PAGE_SIZE = 20
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
 export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
   const { userId } = await requireRolePage('student')
-  const [items, defaults, sp] = await Promise.all([listOwn(userId), getProfileName(userId), searchParams])
-  const occupied = [...activeSlotKeys(items)]
+  const sp = await searchParams
+
+  // Each section pages on its own; its cursor is the query param named after it.
+  const queries = STUDENT_GROUPS.map((group) => parseStudentListQuery({ group, cursor: sp[group], limit: PAGE_SIZE }))
+  if (queries.some((q) => q === null)) {
+    return (
+      <div role="alert" className="grid gap-2">
+        <p>Invalid page link.</p>
+        <Link href="/dashboard" className="underline underline-offset-4">
+          Back to your consultations
+        </Link>
+      </div>
+    )
+  }
+
+  // One clock for every query and for the rows' display state.
+  const now = new Date()
+  const [pages, occupied, defaults] = await Promise.all([
+    Promise.all(queries.map((q) => listOwnGroup(userId, q!, now))),
+    listActiveSlots(userId, now),
+    getProfileName(userId),
+  ])
+  const groups = Object.fromEntries(STUDENT_GROUPS.map((g, i) => [g, pages[i]])) as Record<
+    StudentGroup,
+    (typeof pages)[number]
+  >
 
   return (
     <div className="grid gap-6">
@@ -21,7 +48,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
         <BookConsultationButton openOnLoad={sp.book === '1'} occupied={occupied} defaults={defaults} />
       </div>
-      <ConsultationList items={items} occupied={occupied} defaults={defaults} />
+      <ConsultationList groups={groups} searchParams={sp} occupied={occupied} defaults={defaults} />
     </div>
   )
 }
