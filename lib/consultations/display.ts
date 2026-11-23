@@ -87,6 +87,40 @@ export function groupSlotsByPeriod(slots: readonly Date[]): { period: DayPeriod;
 /** Local calendar day as yyyy-MM-dd. */
 export const dayKey = (d: Date): string => format(d, 'yyyy-MM-dd');
 
+/** Slots grouped by local calendar day (`dayKey`), in input order. */
+export function groupByLocalDay(slots: readonly Date[]): Map<string, Date[]> {
+  const days = new Map<string, Date[]>();
+  for (const slot of slots) {
+    const key = dayKey(slot);
+    const list = days.get(key);
+    if (list) list.push(slot);
+    else days.set(key, [slot]);
+  }
+  return days;
+}
+
+export type SlotButtonState = {
+  /** The booking's own time when rescheduling. */
+  isCurrent: boolean;
+  /** Another of the student's active bookings is at this time. */
+  isOccupied: boolean;
+  disabled: boolean;
+  selected: boolean;
+};
+
+/** How one time button in the slot picker is shown. The current slot is never also "occupied". */
+export function slotButtonState(
+  slot: Date,
+  { value, currentIso, occupied }: { value?: string; currentIso?: string; occupied?: ReadonlySet<number> },
+): SlotButtonState {
+  const ms = slot.getTime();
+  const isCurrent = currentIso !== undefined && Date.parse(currentIso) === ms;
+  const isOccupied = !isCurrent && !!occupied?.has(ms);
+  const disabled = isCurrent || isOccupied;
+  const selected = !disabled && !!value && Date.parse(value) === ms;
+  return { isCurrent, isOccupied, disabled, selected };
+}
+
 /** The day to show first: the current booking's day if offered, else the first offered day. */
 export function initialDay(dayKeys: readonly string[], currentIso?: string): string | undefined {
   if (currentIso) {
@@ -128,6 +162,11 @@ export const ROW_ACTION_LABEL: Record<RowAction, string> = {
  */
 export function actionAriaLabel(action: RowAction, slotLabel: string): string | undefined {
   return slotLabel ? `${ROW_ACTION_LABEL[action]}, consultation on ${slotLabel}` : undefined;
+}
+
+/** Accessible name for a row's ⋯ menu. Plain "More actions" until the slot label is known. */
+export function moreActionsAriaLabel(slotLabel: string): string {
+  return slotLabel ? `More actions for consultation on ${slotLabel}` : 'More actions';
 }
 
 /** Row actions for a display state. The primary action is `visible[0]`; `menu` holds the rest. */

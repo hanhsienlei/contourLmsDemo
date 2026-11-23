@@ -15,6 +15,9 @@ import {
   rowLayout,
   ROW_ACTION_LABEL,
   actionAriaLabel,
+  groupByLocalDay,
+  slotButtonState,
+  moreActionsAriaLabel,
 } from '@/lib/consultations/display';
 import type { ConsultationStatus } from '@/lib/consultations/rules';
 
@@ -301,5 +304,55 @@ describe('actionAriaLabel', () => {
 
   it('is undefined before the slot label is known, so the visible text is the name', () => {
     expect(actionAriaLabel('reschedule', '')).toBeUndefined();
+  });
+});
+
+describe('groupByLocalDay', () => {
+  it('groups slots by local day, keeping order', () => {
+    const a = new Date(2030, 0, 10, 9, 0);
+    const b = new Date(2030, 0, 10, 9, 15);
+    const c2 = new Date(2030, 0, 11, 9, 0);
+    const days = groupByLocalDay([a, b, c2]);
+    expect([...days.keys()]).toEqual(['2030-01-10', '2030-01-11']);
+    expect(days.get('2030-01-10')).toEqual([a, b]);
+    expect(days.get('2030-01-11')).toEqual([c2]);
+  });
+
+  it('is empty for no slots', () => {
+    expect(groupByLocalDay([]).size).toBe(0);
+  });
+});
+
+describe('slotButtonState', () => {
+  const slot = new Date('2030-01-12T00:00:00Z');
+  const ms = slot.getTime();
+  const at = slot.toISOString();
+
+  it('is a plain enabled button by default', () => {
+    expect(slotButtonState(slot, {})).toEqual({ isCurrent: false, isOccupied: false, disabled: false, selected: false });
+  });
+
+  it('is selected when it matches the value', () => {
+    expect(slotButtonState(slot, { value: at }).selected).toBe(true);
+  });
+
+  it('is disabled and not selected when occupied', () => {
+    const s = slotButtonState(slot, { value: at, occupied: new Set([ms]) });
+    expect(s).toMatchObject({ isOccupied: true, disabled: true, selected: false });
+  });
+
+  it('treats the current slot as current, not occupied, even if it is in the occupied set', () => {
+    const s = slotButtonState(slot, { currentIso: at, occupied: new Set([ms]) });
+    expect(s).toMatchObject({ isCurrent: true, isOccupied: false, disabled: true, selected: false });
+  });
+});
+
+describe('moreActionsAriaLabel', () => {
+  it('includes the slot when known', () => {
+    expect(moreActionsAriaLabel('Tue 24 Nov, 10:00 am')).toBe('More actions for consultation on Tue 24 Nov, 10:00 am');
+  });
+
+  it('is never blank before the slot label is known', () => {
+    expect(moreActionsAriaLabel('')).toBe('More actions');
   });
 });

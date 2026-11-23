@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ApiClientError } from '@/lib/api/client'
+import { ApiClientError, GENERIC_ERROR } from '@/lib/api/client'
 
 /**
  * Runs one API request at a time: toast on success/failure, refresh server data on success.
@@ -32,7 +32,7 @@ export function useApiAction() {
       router.refresh()
     } catch (err) {
       const conflict = err instanceof ApiClientError && err.status === 409
-      toast.error(err instanceof Error ? err.message : 'Something went wrong', {
+      toast.error(err instanceof Error ? err.message : GENERIC_ERROR, {
         description: conflict ? opts?.conflictHint : undefined,
       })
     } finally {

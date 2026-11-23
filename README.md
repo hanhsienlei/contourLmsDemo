@@ -70,7 +70,7 @@ npm run build
 npm run db:types     # regenerate lib/supabase/database.types.ts from the local schema
 ```
 
-`npm test` runs 158 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
+`npm test` runs 167 tests: Vitest unit tests, plus integration tests against the local Supabase instance covering the schema, the direct-API lockdown, the guards, the service and the route handlers. The integration tests mock only the session module (`lib/auth/session.ts`), so they choose who is signed in. Everything else runs for real: role lookup, the service, Postgres constraints and the route handlers.
 
 ## 2. Implementation summary
 
@@ -328,6 +328,8 @@ Known minor gaps:
 Nothing in the planned scope was cut. Admin pagination is built. Next steps:
 
 - Pagination for the student's own list (it currently returns all their bookings).
+- Make the admin list open on upcoming bookings. It sorts from the oldest booking ever and has only First page and Next page, so as data grows page 1 is old history. Fix: default to `scheduled_at >= now`, with a separate "Past" view and Previous page.
+- Decide whether a student may mark a booking complete before its time. It is allowed today (see Assumptions). If not, the service would reject `completed` while `scheduled_at` is in the future.
 - Put the role in the JWT with a custom access token hook, to drop the per-request role lookup (and accept the staleness trade-off).
 - Add RLS read policies back as a second layer of protection under the service, with pgTAP tests for them.
 - Keep `profiles.email` in sync when a user changes their email.

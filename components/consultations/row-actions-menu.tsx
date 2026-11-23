@@ -1,6 +1,7 @@
 'use client'
 
 import { MoreHorizontal } from 'lucide-react'
+import { moreActionsAriaLabel } from '@/lib/consultations/display'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
@@ -27,7 +28,7 @@ export function RowActionsMenu({
           variant="ghost"
           size="icon"
           className={className}
-          aria-label={`More actions for consultation on ${slotLabel}`}
+          aria-label={moreActionsAriaLabel(slotLabel)}
         >
           <MoreHorizontal aria-hidden />
         </Button>

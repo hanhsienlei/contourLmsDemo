@@ -3,7 +3,7 @@
 import { useId, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { BOOKING_HELP, availableSlots } from '@/lib/consultations/rules'
-import { dayKey, groupSlotsByPeriod, initialDay } from '@/lib/consultations/display'
+import { dayKey, groupByLocalDay, groupSlotsByPeriod, initialDay, slotButtonState } from '@/lib/consultations/display'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,29 +13,19 @@ import { useMounted } from './use-mounted'
 type Props = {
   value?: string
   onChange(iso: string): void
-  now?: Date
   /** Epoch ms of slots the student already has booked. */
   occupied?: Set<number>
   /** The consultation's current time (reschedule); shown as "Current". */
   currentIso?: string
 }
 
-function groupByLocalDay(slots: Date[]): Map<string, Date[]> {
-  const days = new Map<string, Date[]>()
-  for (const slot of slots) {
-    const key = dayKey(slot)
-    days.set(key, [...(days.get(key) ?? []), slot])
-  }
-  return days
-}
-
-/** Day + time selects over the bookable window. `now` is read on the client after mount to avoid hydration drift. */
-export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props) {
+/** Day + time selects over the bookable window. The clock is read on the client after mount to avoid hydration drift. */
+export function SlotPicker({ value, onChange, occupied, currentIso }: Props) {
   const mounted = useMounted()
   const id = useId()
   const days = useMemo(
-    () => (mounted ? groupByLocalDay(availableSlots(now ?? new Date())) : null),
-    [mounted, now],
+    () => (mounted ? groupByLocalDay(availableSlots(new Date())) : null),
+    [mounted],
   )
   const [pickedDay, setPickedDay] = useState<string>()
   if (!days) return <div className="h-9" aria-hidden />
@@ -88,11 +78,11 @@ export function SlotPicker({ value, onChange, now, occupied, currentIso }: Props
                 <div className="flex flex-wrap gap-2">
                   {slots.map((slot) => {
                     const iso = slot.toISOString()
-                    const ms = slot.getTime()
-                    const isCurrent = currentIso !== undefined && Date.parse(currentIso) === ms
-                    const isOccupied = !isCurrent && !!occupied?.has(ms)
-                    const disabled = isCurrent || isOccupied
-                    const selected = !disabled && !!value && Date.parse(value) === ms
+                    const { isCurrent, isOccupied, disabled, selected } = slotButtonState(slot, {
+                      value,
+                      currentIso,
+                      occupied,
+                    })
                     const label = format(slot, 'h:mm aaa')
                     return (
                       <Button

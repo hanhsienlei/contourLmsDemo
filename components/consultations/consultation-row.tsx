@@ -11,6 +11,7 @@ import {
   type DisplayState,
 } from '@/lib/consultations/display'
 import type { Consultation } from '@/lib/consultations/service'
+import { cn } from '@/lib/utils'
 import { CancelDialog } from './cancel-dialog'
 import { CompleteButton } from './complete-button'
 import { ConsultationDialog } from './consultation-dialog'
@@ -61,9 +62,10 @@ export function ConsultationRow({
 
   return (
     <li
-      className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
-        cancelled ? 'bg-muted/40 text-muted-foreground' : ''
-      }`}
+      className={cn(
+        'flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between',
+        cancelled && 'bg-muted/40 text-muted-foreground',
+      )}
     >
       <div className="grid min-w-0 gap-1">
         <p className="truncate font-medium" title={item.reason}>
