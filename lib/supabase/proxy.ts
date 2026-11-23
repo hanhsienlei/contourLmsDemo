@@ -2,10 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+/**
+ * `requestHeaders` are added to the request the app sees (proxy.ts passes the
+ * CSP this way, so Next.js can read its nonce). They are re-applied every time
+ * the response is rebuilt, on top of the refreshed cookies.
+ */
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders: Record<string, string> = {},
+) {
+  const next = () => {
+    const headers = new Headers(request.headers);
+    for (const [key, value] of Object.entries(requestHeaders)) headers.set(key, value);
+    return NextResponse.next({ request: { headers } });
+  };
+  let supabaseResponse = next();
 
   // If the env vars are not set, skip proxy check. You can remove this
   // once you setup the project.
@@ -27,9 +38,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = next();
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );

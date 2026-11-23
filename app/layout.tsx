@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { headers } from "next/headers";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { extractNonce } from "@/lib/csp";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -20,11 +22,16 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Reading the request makes every page dynamic, which a nonce needs: a page
+  // prerendered at build time would carry no nonce and its scripts would be
+  // blocked. next-themes' inline script needs the nonce passed explicitly.
+  const nonce = extractNonce((await headers()).get("content-security-policy"));
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
@@ -33,6 +40,7 @@ export default function RootLayout({
           defaultTheme="light"
           enableSystem={false}
           disableTransitionOnChange
+          nonce={nonce}
         >
           {children}
           <Toaster />
