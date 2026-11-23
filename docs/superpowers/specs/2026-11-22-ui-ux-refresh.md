@@ -128,7 +128,7 @@ Acceptance criteria:
 Same component, showing only the "When" fieldset.
 
 1. Title "Reschedule consultation".
-2. Description: the reason in medium weight, then "Currently {absolute time}".
+2. Description: the reason in medium weight, up to two lines, then "Currently {absolute time}".
 3. Day defaults to the booking's own day if it is still bookable, otherwise the first bookable day.
 4. The booking's current slot is shown as "Current" and disabled. Other occupied slots are disabled as in §6.2.
 5. Footer: "Cancel" and the submit button: "Reschedule" until a slot is chosen, then "Move to {absolute time}"; "Rescheduling…" while sending.
