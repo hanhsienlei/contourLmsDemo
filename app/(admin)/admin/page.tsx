@@ -56,18 +56,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       </header>
       <AdminConsultationTable items={items} now={now} />
       {(q.cursor || nextCursor) && (
-      <nav aria-label="Pagination" className="flex gap-2">
-        {q.cursor && (
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin">First page</Link>
-          </Button>
-        )}
-        {nextCursor && (
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/admin?cursor=${encodeURIComponent(nextCursor)}`}>Next page</Link>
-          </Button>
-        )}
-      </nav>
+        <nav aria-label="Pagination" className="flex gap-2">
+          {q.cursor && (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin">First page</Link>
+            </Button>
+          )}
+          {nextCursor && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/admin?cursor=${encodeURIComponent(nextCursor)}`}>Next page</Link>
+            </Button>
+          )}
+        </nav>
       )}
     </div>
   )

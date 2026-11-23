@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiClientError, apiFetch } from '@/lib/api/client'
+import { ApiClientError, GENERIC_ERROR, apiFetch } from '@/lib/api/client'
 
 function stubFetch(res: Response) {
   const fn = vi.fn().mockResolvedValue(res)
@@ -55,6 +55,14 @@ describe('apiFetch', () => {
     expect(err).toBeInstanceOf(ApiClientError)
     expect(err.status).toBe(500)
     expect(err.code).toBe('internal')
+    expect(err.message).toBe(GENERIC_ERROR)
+  })
+
+  it('shows the generic next-step message for a JSON 5xx, not the server text', async () => {
+    stubFetch(Response.json({ error: { code: 'internal', message: 'Something went wrong' } }, { status: 500 }))
+    const err = await rejection(apiFetch('/api/consultations'))
+    expect(err.code).toBe('internal')
+    expect(err.message).toBe(GENERIC_ERROR)
   })
 
   it('rejects when the response was redirected (signed out)', async () => {
@@ -68,6 +76,7 @@ describe('apiFetch', () => {
     expect(err).toBeInstanceOf(ApiClientError)
     expect(err.status).toBe(401)
     expect(err.code).toBe('unauthenticated')
+    expect(err.message).not.toMatch(/please/i)
   })
 
   it('rejects a 2xx that is not JSON', async () => {

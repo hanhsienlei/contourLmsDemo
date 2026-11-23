@@ -10,12 +10,10 @@ export function BookConsultationButton({
   openOnLoad = false,
   occupied,
   defaults,
-  label = 'Book a consultation',
 }: {
   openOnLoad?: boolean
   occupied: number[]
   defaults: { firstName: string; lastName: string }
-  label?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(openOnLoad)
@@ -28,7 +26,7 @@ export function BookConsultationButton({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>{label}</Button>
+      <Button onClick={() => setOpen(true)}>Book a consultation</Button>
       <ConsultationDialog
         mode="book"
         open={open}

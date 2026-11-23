@@ -9,6 +9,9 @@ export class ApiClientError extends Error {
   }
 }
 
+/** Shown when the server gives no usable message. Says what happened, then what to do (UI spec §3.5). */
+export const GENERIC_ERROR = 'Something went wrong. Try again in a moment.'
+
 type Init = { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown }
 
 export async function apiFetch<T>(path: string, init: Init = {}): Promise<T> {
@@ -21,18 +24,18 @@ export async function apiFetch<T>(path: string, init: Init = {}): Promise<T> {
   // A followed redirect (e.g. to the login page) or a non-JSON 2xx is never a
   // real API success.
   if (res.redirected) {
-    throw new ApiClientError(401, 'unauthenticated', 'Please sign in again')
+    throw new ApiClientError(401, 'unauthenticated', 'Your session has ended. Sign in again.')
   }
   const data = await res.json().catch(() => null)
   if (res.ok && !(res.headers.get('content-type') ?? '').includes('application/json')) {
-    throw new ApiClientError(res.status, 'internal', 'Something went wrong')
+    throw new ApiClientError(res.status, 'internal', GENERIC_ERROR)
   }
   if (!res.ok) {
     const e = data?.error
     throw new ApiClientError(
       res.status,
       typeof e?.code === 'string' ? e.code : 'internal',
-      typeof e?.message === 'string' ? e.message : 'Something went wrong',
+      typeof e?.message === 'string' && res.status < 500 ? e.message : GENERIC_ERROR,
     )
   }
   return data as T
